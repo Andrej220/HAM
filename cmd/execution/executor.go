@@ -27,6 +27,7 @@ func newValidationHandler(next http.Handler) http.Handler {
 }
 
 func (h validationHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
+	defer r.Body.Close()
 	var request executorRequest
 	decoder := json.NewDecoder(r.Body)
 
