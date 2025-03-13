@@ -32,9 +32,11 @@ func (h validationHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 
 	err := decoder.Decode(&request)
 	if err != nil{
-		http.Error(rw, "Bad request", http.StatusBadRequest)
+		http.Error(rw, fmt.Sprintf("Invalid request: %v", err), http.StatusBadRequest)
+		return
 	}
 
+	//Connect ot a remote host and fetch data
 	GetRemoteConfig(request.HostID, request.ScriptID)
 
 	// get results and store them in DB
