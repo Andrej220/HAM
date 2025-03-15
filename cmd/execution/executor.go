@@ -13,10 +13,9 @@ import (
 	"syscall"
 	"os"
 	"github.com/google/uuid"
-//	"strings"
 )
 
-var pool *WorkerPool 
+var pool WorkerPool[SSHJobStruct]
 
 type executorResponse struct{
 	ExecutionUID uuid.UUID `json:"exuid"`
@@ -56,7 +55,8 @@ func (h validationHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 	h.next.ServeHTTP(rw, r.WithContext(ctx))
 }
 
-type executorHandler struct{}
+type executorHandler struct{
+}
 
 func newExecutorHandler() http.Handler {
 	return &executorHandler{}
@@ -73,12 +73,17 @@ func (h executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 	//TODO: get results and store them in DB
 	//Connect ot a remote host and fetch data
 	newUUID := uuid.New()
-	jb := Job{ HostID: request.HostID, 
-		     ScriptID: request.ScriptID, 
-			 UUID: newUUID,
+	sshJob := SSHJobStruct{
+		HostID: request.HostID, 
+		ScriptID: request.ScriptID, 
+		UUID: newUUID,
+	}
+	jb := WorkerPoolJob[SSHJobStruct]{ 
+			 Payload: sshJob,
 			 fn: GetRemoteConfig,
 			}
 	pool.Submit(jb)
+
 	response := executorResponse{ ExecutionUID: newUUID}
 	//
 	//TODO: in goroutine save data to a file or DB
@@ -92,7 +97,6 @@ func (h executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 }
 
 func main(){
-	pool = NewWorkerPool()
 
 	port := os.Getenv("EXECUTORPORT")
 	if port == "" {

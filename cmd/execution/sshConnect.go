@@ -11,13 +11,18 @@ import (
 
 const MAXLINES = 50
 
-type SSHExecConfig struct {
-	IP       string
-	Username string
-	Password string
-	Script   string
+type SSHJobStruct struct {
+    HostID      int
+    ScriptID    int
+    UUID        uuid.UUID
 }
 
+type SSHExecConfig struct {
+	IP          string
+	Username    string
+	Password    string
+	Script      string
+}
 
 type OutputHandler interface {
     Process(line string) error
@@ -175,7 +180,7 @@ func collectResults(outputChan chan Output, doneChan chan<- struct{},data *Confi
     log.Println("End of data collection.")
 }
 
-func GetRemoteConfig(hostid int, scriptid int, jobuuid uuid.UUID) error {
+func GetRemoteConfig(jb SSHJobStruct) error {
     outputChan := make(chan Output, MAXLINES)
     doneChan := make(chan struct{}, 2)
 
@@ -189,7 +194,7 @@ func GetRemoteConfig(hostid int, scriptid int, jobuuid uuid.UUID) error {
     }
 //!!!!!!!!!!!!!!!
 
-    sshExecConfig := configs[hostid]
+    sshExecConfig := configs[jb.HostID]
     
     go executeScript(sshExecConfig, outputChan, doneChan, &data)
     go collectResults(outputChan, doneChan, &data)
@@ -198,7 +203,7 @@ func GetRemoteConfig(hostid int, scriptid int, jobuuid uuid.UUID) error {
     <-doneChan
 
     log.Println("Script execution and data collection completed.")
-    //TODO: send data to pareser, return it back
+    //TODO: send data to pareser, return
     fmt.Println("Stdout:", data.StdoutLines)
     fmt.Println("Stderr:", data.StderrLines)
     fmt.Println("Errors:", data.Errors)

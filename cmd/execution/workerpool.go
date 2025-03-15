@@ -4,51 +4,48 @@ import (
 	"log"
 	"sync"
 	"sync/atomic"
-	"github.com/google/uuid"
 )
 const MAXWORKERS = 100
 
-type workerFunction func(int, int, uuid.UUID) error
+type workerFunction[T any] func(T) error
 
-type Job struct {
-	HostID   	int
-	ScriptID 	int
-	UUID   		uuid.UUID
-	fn			workerFunction
+type WorkerPoolJob[T any] struct{
+	Payload T
+	fn		workerFunction[T]
 }
 
-type WorkerPool struct {
-	Jobs         chan Job      
+type WorkerPool[T any] struct {
+	Jobs         chan WorkerPoolJob[T]      
 	activeWorkers int32         
 	wg           sync.WaitGroup 
 	quit         chan struct{}  
 }
 
-func NewWorkerPool() *WorkerPool {
-	pool := &WorkerPool{
-		Jobs:  make(chan Job, MAXWORKERS), 
+func NewWorkerPool[T any]() *WorkerPool[T] {
+	pool := &WorkerPool[T]{
+		Jobs:  make(chan WorkerPoolJob[T], MAXWORKERS), 
 		quit:  make(chan struct{}),
 	}
 	go pool.dispatch() 
 	return pool
 }
 
-func (wp *WorkerPool) Stop() {
+func (wp *WorkerPool[T]) Stop() {
 	close(wp.quit)
 	wp.wg.Wait()
 	close(wp.Jobs)
 }
 
-func (wp *WorkerPool) Submit(job Job) {
+func (wp *WorkerPool[T]) Submit(job WorkerPoolJob[T]) {
 	select {
 	case wp.Jobs <- job:
-		log.Printf("Job submitted: HostID=%d, ScriptID=%d, UUID=%s", job.HostID, job.ScriptID, job.UUID)
+		log.Printf("WorkerPoolJob submitted with payload: %+v", job.Payload)
 	case <-wp.quit:
 		log.Println("Worker pool is shutting down, job rejected")
 	}
 }
 
-func (wp *WorkerPool) dispatch() {
+func (wp *WorkerPool[T]) dispatch() {
 	for {
 		select {
 		case job := <-wp.Jobs:
@@ -61,24 +58,21 @@ func (wp *WorkerPool) dispatch() {
 	}
 }
 
-func (wp *WorkerPool) worker(job Job) {
+func (wp *WorkerPool[T]) worker(job WorkerPoolJob[T]) {
 	defer wp.wg.Done()
 	defer atomic.AddInt32(&wp.activeWorkers, -1)
 
-	log.Printf("Worker started for job: HostID=%d, ScriptID=%d. Active workers: %d",
-		job.HostID, job.ScriptID, atomic.LoadInt32(&wp.activeWorkers))
+	log.Printf("Worker started with payload: %+v; # of workers: %d",job.Payload, atomic.LoadInt32(&wp.activeWorkers))
 
 	// Execute the task
-	err:=job.fn(job.HostID, job.ScriptID, job.UUID)
+	err:=job.fn(job.Payload)
 	if err!= nil{
-		log.Printf("Worker started for job: HostID=%d, ScriptID=%d, UUID: %s",
-		job.HostID, job.ScriptID, job.UUID)
+		log.Printf("Worker started with payload %+v", job.Payload)
 	}else{
-		log.Printf("Worker finished for job: HostID=%d, ScriptID=%d. Active workers: %d",
-			job.HostID, job.ScriptID, atomic.LoadInt32(&wp.activeWorkers))
+		log.Printf("Worker finished for job with payload: %+v; # of workers: %d", job.Payload, atomic.LoadInt32(&wp.activeWorkers))
 	}
 }
 
-func (wp *WorkerPool) ActiveWorkers() int32 {
+func (wp *WorkerPool[T]) ActiveWorkers() int32 {
 	return atomic.LoadInt32(&wp.activeWorkers)
 }
