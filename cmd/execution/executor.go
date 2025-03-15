@@ -16,8 +16,6 @@ import (
 	"executor/pkg/workerpool"
 )
 
-var pool *workerpool.Pool[SSHJobStruct]
-
 type executorResponse struct{
 	ExecutionUID uuid.UUID `json:"exuid"`
 }
@@ -57,10 +55,13 @@ func (h validationHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 }
 
 type executorHandler struct{
+	pool *workerpool.Pool[SSHJobStruct]
 }
 
 func newExecutorHandler() http.Handler {
-	return &executorHandler{}
+	h := executorHandler{}
+	h.pool = workerpool.NewPool[SSHJobStruct](workerpool.MAXWORKERS)
+	return &h
 }
 
 func (h executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
@@ -83,7 +84,7 @@ func (h executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 		Payload: sshJob,
 		Fn: GetRemoteConfig,
 	}
-	pool.Submit(jb)
+	h.pool.Submit(jb)
 
 	response := executorResponse{ ExecutionUID: newUUID}
 	//
@@ -98,14 +99,14 @@ func (h executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 }
 
 func main(){
-	pool = workerpool.NewPool[SSHJobStruct](workerpool.MAXWORKERS)
 	port := os.Getenv("EXECUTORPORT")
 	if port == "" {
 		port = "8081"
 	}
 	
 	mux := http.NewServeMux()
-	mux.Handle("/executor", newValidationHandler(newExecutorHandler()))
+	handler:=newExecutorHandler()
+	mux.Handle("/executor", newValidationHandler(handler))
 	// Configure server
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),
@@ -127,7 +128,9 @@ func main(){
 	
 	<-done
 	log.Print("Server stopping...")
-	pool.Stop()
+
+	exh := handler.(*executorHandler)  //assert type
+	exh.pool.Stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
