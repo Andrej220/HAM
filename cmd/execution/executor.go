@@ -13,9 +13,10 @@ import (
 	"syscall"
 	"os"
 	"github.com/google/uuid"
+	"executor/pkg/workerpool"
 )
 
-var pool WorkerPool[SSHJobStruct]
+var pool *workerpool.Pool[SSHJobStruct]
 
 type executorResponse struct{
 	ExecutionUID uuid.UUID `json:"exuid"`
@@ -78,10 +79,10 @@ func (h executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 		ScriptID: request.ScriptID, 
 		UUID: newUUID,
 	}
-	jb := WorkerPoolJob[SSHJobStruct]{ 
-			 Payload: sshJob,
-			 fn: GetRemoteConfig,
-			}
+	jb := workerpool.Job[SSHJobStruct]{ 
+		Payload: sshJob,
+		Fn: GetRemoteConfig,
+	}
 	pool.Submit(jb)
 
 	response := executorResponse{ ExecutionUID: newUUID}
@@ -97,7 +98,7 @@ func (h executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 }
 
 func main(){
-
+	pool = workerpool.NewPool[SSHJobStruct](workerpool.MAXWORKERS)
 	port := os.Getenv("EXECUTORPORT")
 	if port == "" {
 		port = "8081"
