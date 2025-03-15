@@ -6,7 +6,10 @@ import (
 	"time"
     "log"
 	"golang.org/x/crypto/ssh"
+    "github.com/google/uuid"
 )
+
+const MAXLINES = 50
 
 type SSHExecConfig struct {
 	IP       string
@@ -172,16 +175,17 @@ func collectResults(outputChan chan Output, doneChan chan<- struct{},data *Confi
     log.Println("End of data collection.")
 }
 
-func GetRemoteConfig(hostid int, scriptid int) {
-    outputChan := make(chan Output, 50)
+func GetRemoteConfig(hostid int, scriptid int, jobuuid uuid.UUID) error {
+    outputChan := make(chan Output, MAXLINES)
     doneChan := make(chan struct{}, 2)
 
     data := ConfigData{}
     
-// TEST config, should fetched from DB
+// TEST config, should be fetched from DB
     configs,err := LoadConfigs()
     if err != nil{
         log.Printf("Error reading configuration %v:", err)
+        return err
     }
 //!!!!!!!!!!!!!!!
 
@@ -194,7 +198,9 @@ func GetRemoteConfig(hostid int, scriptid int) {
     <-doneChan
 
     log.Println("Script execution and data collection completed.")
+    //TODO: send data to pareser, return it back
     fmt.Println("Stdout:", data.StdoutLines)
     fmt.Println("Stderr:", data.StderrLines)
     fmt.Println("Errors:", data.Errors)
+    return nil
 }

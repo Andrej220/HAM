@@ -1,0 +1,20 @@
+[
+    {
+        "ip": "192.168.1.105:22",
+        "username": "master",
+        "password": "nekochegar",
+        "script": "echo host 0 && echo error >&2; sleep 2"
+    },
+    {
+        "ip": "192.168.1.107:22",
+        "username": "master",
+        "password": "nekochegar",
+        "script": "echo 'host 1'; sleep 2"
+    },
+    {
+        "ip": "192.168.1.105:22",
+        "username": "master",
+        "password": "nekochegar",
+        "script": "echo 'Host 2'; sleep 2"
+    }
+]
