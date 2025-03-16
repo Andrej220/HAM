@@ -14,7 +14,10 @@ import (
 	"os"
 	"github.com/google/uuid"
 	"executor/pkg/workerpool"
+	"sync"
 )
+
+const MAXTIMEOUT time.Duration = 5*time.Minute
 
 type executorResponse struct{
 	ExecutionUID uuid.UUID `json:"exuid"`
@@ -56,6 +59,7 @@ func (h validationHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 
 type executorHandler struct{
 	pool *workerpool.Pool[SSHJobStruct]
+	cancelFuncs sync.Map
 }
 
 func newExecutorHandler() http.Handler {
@@ -64,14 +68,15 @@ func newExecutorHandler() http.Handler {
 	return &h
 }
 
-func (h executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
+func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 	
 	request, ok := r.Context().Value("request").(executorRequest)
 	if !ok {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
+	
+	ctx, cancel := context.WithTimeout(r.Context(), MAXTIMEOUT )
 	//TODO: get results and store them in DB
 	//Connect ot a remote host and fetch data
 	newUUID := uuid.New()
@@ -83,7 +88,17 @@ func (h executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 	jb := workerpool.Job[SSHJobStruct]{ 
 		Payload: sshJob,
 		Fn: GetRemoteConfig,
+		Ctx: ctx,
+		CleanupFunc: func() {
+			if cancel, ok := h.cancelFuncs.Load(newUUID); ok {
+				cancel.(context.CancelFunc)()
+				h.cancelFuncs.Delete(newUUID)
+			}
+		},
 	}
+	
+	h.cancelFuncs.Store(newUUID,cancel)
+
 	h.pool.Submit(jb)
 
 	response := executorResponse{ ExecutionUID: newUUID}

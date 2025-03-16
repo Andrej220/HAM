@@ -14,6 +14,7 @@ type Job[T any] struct{
 	Payload T
 	Fn		JobFunc[T]
 	Ctx	context.Context
+	CleanupFunc func()
 }
 
 type Pool[T any] struct {
@@ -69,15 +70,30 @@ func (p *Pool[T]) dispatch() {
 func (p *Pool[T]) worker(job Job[T]) {
 	defer p.wg.Done()
 	defer atomic.AddInt32(&p.activeWorkers, -1)
+	defer func() {
+		if job.CleanupFunc != nil {
+			job.CleanupFunc()
+		}
+	}()
 
-	log.Printf("Worker started with payload: %+v; # of workers: %d",job.Payload, atomic.LoadInt32(&p.activeWorkers))
+	log.Printf("Worker started with payload: %+v; # of workers: %d", job.Payload, atomic.LoadInt32(&p.activeWorkers))
 
-	// Execute the task
-	err:=job.Fn(job.Payload)
-	if err!= nil{
-		log.Printf("Worker started with payload %+v", job.Payload)
-	}else{
-		log.Printf("Worker finished for job with payload: %+v; # of workers: %d", job.Payload, atomic.LoadInt32(&p.activeWorkers))
+	doneCh := make(chan error, 1)
+
+	go func() {
+		doneCh <- job.Fn(job.Payload)
+	}()
+
+	select {
+	case <-job.Ctx.Done():
+		log.Printf("Job canceled with payload: %+v, reason: %v", job.Payload, job.Ctx.Err())
+	case err := <-doneCh:
+		if err != nil {
+			log.Printf("Worker error with payload %+v: %v", job.Payload, err)
+		} else {
+			log.Printf("Worker finished for job with payload: %+v; # of workers: %d",
+				job.Payload, atomic.LoadInt32(&p.activeWorkers))
+		}
 	}
 }
 
