@@ -59,12 +59,14 @@ func (h validationHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 
 type executorHandler struct{
 	pool *workerpool.Pool[SSHJobStruct]
+	dspool *workerpool.Pool[DSjobStruct]
 	cancelFuncs sync.Map
 }
 
 func newExecutorHandler() http.Handler {
 	h := executorHandler{}
 	h.pool = workerpool.NewPool[SSHJobStruct](workerpool.MAXWORKERS)
+	h.dspool = workerpool.NewPool[DSjobStruct](workerpool.MAXWORKERS)
 	return &h
 }
 
@@ -80,11 +82,23 @@ func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 	//TODO: get results and store them in DB
 	//Connect ot a remote host and fetch data
 	newUUID := uuid.New()
+
+	dataChan := make(chan string, 100)  // pipe to save data in a file
+
 	sshJob := SSHJobStruct{
 		HostID: request.HostID, 
 		ScriptID: request.ScriptID, 
 		UUID: newUUID,
+		dataChan: dataChan,
 	}
+
+	dsJob := DSjobStruct{
+		HostID: request.HostID, 
+		ScriptID: request.ScriptID, 
+		UUID: newUUID,
+		dataChan: dataChan,
+	}
+
 	jb := workerpool.Job[SSHJobStruct]{ 
 		Payload: sshJob,
 		Fn: GetRemoteConfig,
@@ -96,11 +110,18 @@ func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 			}
 		},
 	}
-	
+
+	dsWPJob := workerpool.Job[DSjobStruct]{
+		Payload: dsJob,
+		Fn: WriteFile,
+		Ctx: ctx,
+	}
+
 	h.cancelFuncs.Store(newUUID,cancel)
 
 	h.pool.Submit(jb)
-
+	h.dspool.Submit(dsWPJob)
+	
 	response := executorResponse{ ExecutionUID: newUUID}
 	//
 	//TODO: in goroutine save data to a file or DB

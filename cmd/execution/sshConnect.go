@@ -16,6 +16,7 @@ type SSHJobStruct struct {
     HostID      int
     ScriptID    int
     UUID        uuid.UUID
+    dataChan    chan string
 }
 
 type SSHExecConfig struct {
@@ -163,10 +164,14 @@ func executeScript(execConfig SSHExecConfig, outputChan chan<- Output, doneChan 
     log.Println("cript execution and stdout reading completed.")
 }
 
-func collectResults(outputChan chan Output, doneChan chan<- struct{},data *ConfigData){
+func collectResults(inputChan chan Output, outChan chan string ,doneChan chan<- struct{},data *ConfigData){
     defer func() { doneChan <- struct{}{} }()
     log.Println("Collecting data...")
-    for output := range outputChan {
+    for output := range inputChan {
+        // pass data line only if stdout
+        if _,ok := output.Handler.(*StdoutHandler); ok{
+            outChan <- output.Line + "\n"
+        }
         if err := output.Handler.Process(output.Line); err!=nil{
             data.Errors = append(data.Errors, fmt.Sprintf("Processing %s: %v", output.Handler.Source(), err))
         }
@@ -191,7 +196,7 @@ func GetRemoteConfig(jb SSHJobStruct) error {
     sshExecConfig := configs[jb.HostID]
     
     go executeScript(sshExecConfig, outputChan, doneChan, &data)
-    go collectResults(outputChan, doneChan, &data)
+    go collectResults(outputChan, jb.dataChan, doneChan, &data)
     
     <-doneChan
     <-doneChan
