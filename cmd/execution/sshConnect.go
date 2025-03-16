@@ -7,6 +7,7 @@ import (
     "log"
 	"golang.org/x/crypto/ssh"
     "github.com/google/uuid"
+    "io"
 )
 
 const MAXLINES = 50
@@ -79,6 +80,17 @@ type Output struct {
     Line    string
 }
 
+func scanPipe(reader io.Reader, outputChan chan<- Output, handler OutputHandler, scanDone chan<- struct{}) {
+    defer func() { scanDone <- struct{}{} }()
+    scanner := bufio.NewScanner(reader)
+    for scanner.Scan() {
+        outputChan <- Output{Handler: handler, Line: scanner.Text()}
+    }
+    if err := scanner.Err(); err != nil {
+        outputChan <- Output{Handler: handler, Line: fmt.Sprintf("%s scan error: %v", handler.Source(), err)}
+    }
+}
+
 func executeScript(execConfig SSHExecConfig, outputChan chan<- Output, doneChan chan<- struct{}, data *ConfigData) {
     defer close(outputChan)
     defer func() { doneChan <- struct{}{} }()
@@ -138,27 +150,9 @@ func executeScript(execConfig SSHExecConfig, outputChan chan<- Output, doneChan 
     scanDone := make(chan struct{}, 2)
 
     log.Println("Start reading stdout.")
-    go func() {
-        defer func() { scanDone <- struct{}{} }()
-        scanner := bufio.NewScanner(stdout)
-        for scanner.Scan() {
-            outputChan <- Output{Handler: handlers.Stdout, Line: scanner.Text()}
-        }
-        if err := scanner.Err(); err != nil {
-            outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("stdout scan error: %v", err)}
-        }
-    }()
 
-    go func() {
-        defer func() { scanDone <- struct{}{} }()
-        scanner := bufio.NewScanner(stderr)
-        for scanner.Scan() {
-            outputChan <- Output{Handler: handlers.Stderr, Line: scanner.Text()}
-        }
-        if err := scanner.Err(); err != nil {
-            outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("stderr scan error: %v", err)}
-        }
-    }()
+    go scanPipe(stdout, outputChan, handlers.Stdout, scanDone)
+    go scanPipe(stderr, outputChan, handlers.Stderr, scanDone)
 
     if err := session.Wait(); err != nil {
         outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("Script execution error: %v", err)}
