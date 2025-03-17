@@ -92,10 +92,37 @@ func scanPipe(reader io.Reader, outputChan chan<- Output, handler OutputHandler,
     }
 }
 
+func createSSHSession(execConfig SSHExecConfig) (*ssh.Client, *ssh.Session, error){
+    log.Println("Connecting to SSH server")
+    
+    config := &ssh.ClientConfig{
+        User: execConfig.Username,
+        Auth: []ssh.AuthMethod{ssh.Password(execConfig.Password)},
+        HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+        Timeout:          10 * time.Second,
+    }
+    
+    client, err := ssh.Dial("tcp", execConfig.IP, config)
+    if err != nil {
+        return nil, nil, fmt.Errorf("failed to dial  %w", err)
+    }
+    
+    log.Printf("SSH connection established to %s. Creating session...",execConfig.IP)
+
+    session, err := client.NewSession()
+    if err != nil {
+        return nil, nil, fmt.Errorf("failed to create session: %w",err)
+    }
+
+    log.Printf("Session is created: %s",execConfig.IP)
+
+    return client, session, nil
+}
+
 func executeScript(execConfig SSHExecConfig, outputChan chan<- Output, doneChan chan<- struct{}, data *ConfigData) {
     defer close(outputChan)
     defer func() { doneChan <- struct{}{} }()
-
+    
     handlers := struct {
         Stdout OutputHandler
         Stderr OutputHandler
@@ -105,45 +132,32 @@ func executeScript(execConfig SSHExecConfig, outputChan chan<- Output, doneChan 
         Stderr: &StderrHandler{data},
         Error:  &ErrorHandler{data},
     }
-    log.Println("Connecting to SSH server")
 
-    config := &ssh.ClientConfig{
-        User: execConfig.Username,
-        Auth: []ssh.AuthMethod{ssh.Password(execConfig.Password)},
-        HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-        Timeout:         10 * time.Second,
-    }
-
-    client, err := ssh.Dial("tcp", execConfig.IP, config)
+    client, session, err := createSSHSession(execConfig)
     if err != nil {
-        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("failed to dial %s: %v", execConfig.IP, err)}
-        return
+        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("failed to establish connection: %+v", err)}
+        return 
     }
+    
     defer client.Close()
-
-    log.Println("SSH connection established. Creating session...")
-    session, err := client.NewSession()
-    if err != nil {
-        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("failed to create session: %v", err)}
-        return
-    }
     defer session.Close()
 
     stdout, err := session.StdoutPipe()
     if err != nil {
-        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("Failed to get stdout pipe: %v", err)}
+        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("Failed to get stdout pipe: %+v", err)}
         return
     }
 
     stderr, err := session.StderrPipe()
     if err != nil {
-        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("Failed to get stderr pipe: %v", err)}
+        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("Failed to get stderr pipe: %+v", err)}
         return
     }
 
     log.Println("Executing script.")
     err = session.Start( execConfig.Script)
     if err != nil {
+        fmt.Println(execConfig.Script)
         outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("Failed to start script: %v", err)}
         return
     }
@@ -151,7 +165,6 @@ func executeScript(execConfig SSHExecConfig, outputChan chan<- Output, doneChan 
     scanDone := make(chan struct{}, 2)
 
     log.Println("Start reading stdout.")
-
     go scanPipe(stdout, outputChan, handlers.Stdout, scanDone)
     go scanPipe(stderr, outputChan, handlers.Stderr, scanDone)
 
@@ -161,15 +174,26 @@ func executeScript(execConfig SSHExecConfig, outputChan chan<- Output, doneChan 
 
     <-scanDone
     <-scanDone
-    log.Println("cript execution and stdout reading completed.")
+    log.Println("Script execution and stdout reading completed.")
 }
 
 func collectResults(inputChan chan Output, outChan chan string ,doneChan chan<- struct{},data *ConfigData){
     defer func() { doneChan <- struct{}{} }()
     log.Println("Collecting data...")
     for output := range inputChan {
-        // pass data line only if stdout
-        if _,ok := output.Handler.(*StdoutHandler); ok{
+        // pass data only if stdout and outChan is set
+        // TODO: case for type assertion
+        //switch v := i.(type) {
+        //case int:
+        //    fmt.Println("i is an int:", v)
+        //case string:
+        //    fmt.Println("i is a string:", v)
+        //case float64:
+        //    fmt.Println("i is a float64:", v)
+        //default:
+        //    fmt.Printf("i is of an unknown type: %T\n", v)
+        //}
+        if _,ok := output.Handler.(*StdoutHandler); ok && outChan != nil{
             outChan <- output.Line + "\n"
         }
         if err := output.Handler.Process(output.Line); err!=nil{
