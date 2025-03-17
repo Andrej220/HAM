@@ -14,6 +14,7 @@ import (
 	"os"
 	"github.com/google/uuid"
 	"executor/pkg/workerpool"
+	"executor/pkg/dataservice"
 	"sync"
 )
 
@@ -59,14 +60,14 @@ func (h validationHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 
 type executorHandler struct{
 	pool *workerpool.Pool[SSHJobStruct]
-	dspool *workerpool.Pool[DSjobStruct]
+	dspool *workerpool.Pool[dataservice.DSjobStruct]
 	cancelFuncs sync.Map
 }
 
 func newExecutorHandler() http.Handler {
 	h := executorHandler{}
 	h.pool = workerpool.NewPool[SSHJobStruct](workerpool.MAXWORKERS)
-	h.dspool = workerpool.NewPool[DSjobStruct](workerpool.MAXWORKERS)
+	h.dspool = workerpool.NewPool[dataservice.DSjobStruct](workerpool.MAXWORKERS)
 	return &h
 }
 
@@ -92,11 +93,11 @@ func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 		dataChan: dataChan,
 	}
 
-	dsJob := DSjobStruct{
+	dsJob := dataservice.DSjobStruct{
 		HostID: request.HostID, 
 		ScriptID: request.ScriptID, 
 		UUID: newUUID,
-		dataChan: dataChan,
+		DataChan: dataChan,
 	}
 
 	jb := workerpool.Job[SSHJobStruct]{ 
@@ -111,9 +112,9 @@ func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 		},
 	}
 
-	dsWPJob := workerpool.Job[DSjobStruct]{
+	dsWPJob := workerpool.Job[dataservice.DSjobStruct]{
 		Payload: dsJob,
-		Fn: WriteFile,
+		Fn: dataservice.WriteFile,
 		Ctx: ctx,
 	}
 
@@ -121,7 +122,7 @@ func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 
 	h.pool.Submit(jb)
 	h.dspool.Submit(dsWPJob)
-	
+
 	response := executorResponse{ ExecutionUID: newUUID}
 	//
 	//TODO: in goroutine save data to a file or DB

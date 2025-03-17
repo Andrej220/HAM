@@ -1,4 +1,4 @@
-package main
+package dataservice
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ type DSjobStruct struct {
     HostID      int
     ScriptID    int
     UUID        uuid.UUID
-	dataChan	chan string
+	DataChan	chan string
 }
 
 func WriteFile(job DSjobStruct) error{
@@ -24,7 +24,7 @@ func WriteFile(job DSjobStruct) error{
 	}
 	defer file.Close()
 
-	for line := range job.dataChan {
+	for line := range job.DataChan {
 		_, err := file.WriteString(line)
 		if err !=  nil {
 			log.Printf("Failed to write to file: %s", err)
