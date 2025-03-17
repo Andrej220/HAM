@@ -12,14 +12,14 @@ import (
 
 const MAXLINES = 50
 
-type SSHJobStruct struct {
+type SSHJob struct {
     HostID      int
     ScriptID    int
     UUID        uuid.UUID
-    dataChan    chan string
+    dataCh    chan string
 }
 
-type SSHExecConfig struct {
+type SSHConfig struct {
 	IP          string
 	Username    string
 	Password    string
@@ -31,14 +31,14 @@ type OutputHandler interface {
     Source() string
 }
 
-type ConfigData struct {
+type ExecResults struct {
     StdoutLines []string
     StderrLines []string
     Errors      []string
 }
 
 type StdoutHandler struct {
-    data *ConfigData
+    data *ExecResults
 }
 
 func (h *StdoutHandler) Process(line string) error {
@@ -51,7 +51,7 @@ func (h *StdoutHandler) Source() string {
 }
 
 type StderrHandler struct {
-    data *ConfigData
+    data *ExecResults
 }
 
 func (h *StderrHandler) Process(line string) error {
@@ -64,7 +64,7 @@ func (h *StderrHandler) Source() string {
 }
 
 type ErrorHandler struct {
-    data *ConfigData
+    data *ExecResults
 }
 
 func (h *ErrorHandler) Process(line string) error {
@@ -81,18 +81,18 @@ type Output struct {
     Line    string
 }
 
-func scanPipe(reader io.Reader, outputChan chan<- Output, handler OutputHandler, scanDone chan<- struct{}) {
-    defer func() { scanDone <- struct{}{} }()
+func readOutput(reader io.Reader, outputCh chan<- Output, handler OutputHandler, scanDoneCh chan<- struct{}) {
+    defer func() { scanDoneCh <- struct{}{} }()
     scanner := bufio.NewScanner(reader)
     for scanner.Scan() {
-        outputChan <- Output{Handler: handler, Line: scanner.Text()}
+        outputCh <- Output{Handler: handler, Line: scanner.Text()}
     }
     if err := scanner.Err(); err != nil {
-        outputChan <- Output{Handler: handler, Line: fmt.Sprintf("%s scan error: %v", handler.Source(), err)}
+        outputCh <- Output{Handler: handler, Line: fmt.Sprintf("%s scan error: %v", handler.Source(), err)}
     }
 }
 
-func createSSHSession(execConfig SSHExecConfig) (*ssh.Client, *ssh.Session, error){
+func newSSHSession(execConfig SSHConfig) (*ssh.Client, *ssh.Session, error){
     log.Println("Connecting to SSH server")
     
     config := &ssh.ClientConfig{
@@ -119,11 +119,11 @@ func createSSHSession(execConfig SSHExecConfig) (*ssh.Client, *ssh.Session, erro
     return client, session, nil
 }
 
-func executeScript(execConfig SSHExecConfig, outputChan chan<- Output, doneChan chan<- struct{}, data *ConfigData) {
-    defer close(outputChan)
-    defer func() { doneChan <- struct{}{} }()
+func runRemoteScript(execConfig SSHConfig, outputCh chan<- Output, doneCh chan<- struct{}, data *ExecResults) {
+    defer close(outputCh)
+    defer func() { doneCh <- struct{}{} }()
     
-    handlers := struct {
+    streams := struct {
         Stdout OutputHandler
         Stderr OutputHandler
         Error  OutputHandler
@@ -133,9 +133,9 @@ func executeScript(execConfig SSHExecConfig, outputChan chan<- Output, doneChan 
         Error:  &ErrorHandler{data},
     }
 
-    client, session, err := createSSHSession(execConfig)
+    client, session, err := newSSHSession(execConfig)
     if err != nil {
-        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("failed to establish connection: %+v", err)}
+        outputCh <- Output{Handler: streams.Error, Line: fmt.Sprintf("failed to establish connection: %+v", err)}
         return 
     }
     
@@ -144,13 +144,13 @@ func executeScript(execConfig SSHExecConfig, outputChan chan<- Output, doneChan 
 
     stdout, err := session.StdoutPipe()
     if err != nil {
-        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("Failed to get stdout pipe: %+v", err)}
+        outputCh <- Output{Handler: streams.Error, Line: fmt.Sprintf("Failed to get stdout pipe: %+v", err)}
         return
     }
 
     stderr, err := session.StderrPipe()
     if err != nil {
-        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("Failed to get stderr pipe: %+v", err)}
+        outputCh <- Output{Handler: streams.Error, Line: fmt.Sprintf("Failed to get stderr pipe: %+v", err)}
         return
     }
 
@@ -158,29 +158,29 @@ func executeScript(execConfig SSHExecConfig, outputChan chan<- Output, doneChan 
     err = session.Start( execConfig.Script)
     if err != nil {
         fmt.Println(execConfig.Script)
-        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("Failed to start script: %v", err)}
+        outputCh <- Output{Handler: streams.Error, Line: fmt.Sprintf("Failed to start script: %v", err)}
         return
     }
 
-    scanDone := make(chan struct{}, 2)
+    scanDoneCh := make(chan struct{}, 2)
 
     log.Println("Start reading stdout.")
-    go scanPipe(stdout, outputChan, handlers.Stdout, scanDone)
-    go scanPipe(stderr, outputChan, handlers.Stderr, scanDone)
+    go readOutput(stdout, outputCh, streams.Stdout, scanDoneCh)
+    go readOutput(stderr, outputCh, streams.Stderr, scanDoneCh)
 
     if err := session.Wait(); err != nil {
-        outputChan <- Output{Handler: handlers.Error, Line: fmt.Sprintf("Script execution error: %v", err)}
+        outputCh <- Output{Handler: streams.Error, Line: fmt.Sprintf("Script execution error: %v", err)}
     }
 
-    <-scanDone
-    <-scanDone
+    <-scanDoneCh
+    <-scanDoneCh
     log.Println("Script execution and stdout reading completed.")
 }
 
-func collectResults(inputChan chan Output, outChan chan string ,doneChan chan<- struct{},data *ConfigData){
-    defer func() { doneChan <- struct{}{} }()
+func handleOutput(inputCh chan Output, outChan chan string ,doneCh chan<- struct{},data *ExecResults){
+    defer func() { doneCh <- struct{}{} }()
     log.Println("Collecting data...")
-    for output := range inputChan {
+    for output := range inputCh {
         // pass data only if stdout and outChan is set
         // TODO: case for type assertion
         //switch v := i.(type) {
@@ -203,11 +203,11 @@ func collectResults(inputChan chan Output, outChan chan string ,doneChan chan<- 
     log.Println("End of data collection.")
 }
 
-func GetRemoteConfig(jb SSHJobStruct) error {
-    outputChan := make(chan Output, MAXLINES)
-    doneChan := make(chan struct{}, 2)
+func FetchRemoteData(jb SSHJob) error {
+    outputCh := make(chan Output, MAXLINES)
+    doneCh := make(chan struct{}, 2)
 
-    data := ConfigData{}
+    result := ExecResults{}
     
 // TEST config, should be fetched from DB
     configs,err := LoadConfigs()
@@ -217,18 +217,18 @@ func GetRemoteConfig(jb SSHJobStruct) error {
     }
 //!!!!!!!!!!!!!!!
 
-    sshExecConfig := configs[jb.HostID]
+    sshExecCfg := configs[jb.HostID]
     
-    go executeScript(sshExecConfig, outputChan, doneChan, &data)
-    go collectResults(outputChan, jb.dataChan, doneChan, &data)
+    go runRemoteScript(sshExecCfg, outputCh, doneCh, &result)
+    go handleOutput(outputCh, jb.dataCh, doneCh, &result)
     
-    <-doneChan
-    <-doneChan
+    <-doneCh
+    <-doneCh
 
     log.Println("Script execution and data collection completed.")
     //TODO: send data to pareser, return
-    fmt.Println("Stdout:", data.StdoutLines)
-    fmt.Println("Stderr:", data.StderrLines)
-    fmt.Println("Errors:", data.Errors)
+    fmt.Println("Stdout:", result.StdoutLines)
+    fmt.Println("Stderr:", result.StderrLines)
+    fmt.Println("Errors:", result.Errors)
     return nil
 }

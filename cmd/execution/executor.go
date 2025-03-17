@@ -59,14 +59,14 @@ func (h validationHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 }
 
 type executorHandler struct{
-	pool *workerpool.Pool[SSHJobStruct]
+	pool *workerpool.Pool[SSHJob]
 	dspool *workerpool.Pool[dataservice.DSjobStruct]
 	cancelFuncs sync.Map
 }
 
 func newExecutorHandler() http.Handler {
 	h := executorHandler{}
-	h.pool = workerpool.NewPool[SSHJobStruct](workerpool.MAXWORKERS)
+	h.pool = workerpool.NewPool[SSHJob](workerpool.MAXWORKERS)
 	h.dspool = workerpool.NewPool[dataservice.DSjobStruct](workerpool.MAXWORKERS)
 	return &h
 }
@@ -84,25 +84,25 @@ func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 	//Connect ot a remote host and fetch data
 	newUUID := uuid.New()
 
-	dataChan := make(chan string, 100)  // pipe to save data in a file
+	dataCh := make(chan string, 100)  // pipe to save data in a file
 
-	sshJob := SSHJobStruct{
+	sshJob := SSHJob{
 		HostID: request.HostID, 
 		ScriptID: request.ScriptID, 
 		UUID: newUUID,
-		dataChan: dataChan,
+		dataCh: dataCh,
 	}
 
 	dsJob := dataservice.DSjobStruct{
 		HostID: request.HostID, 
 		ScriptID: request.ScriptID, 
 		UUID: newUUID,
-		DataChan: dataChan,
+		DataChan: dataCh,
 	}
 
-	jb := workerpool.Job[SSHJobStruct]{ 
+	jb := workerpool.Job[SSHJob]{ 
 		Payload: sshJob,
-		Fn: GetRemoteConfig,
+		Fn: FetchRemoteData,
 		Ctx: ctx,
 		CleanupFunc: func() {
 			if cancel, ok := h.cancelFuncs.Load(newUUID); ok {
