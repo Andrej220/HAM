@@ -1,4 +1,4 @@
-package main
+package sshrunner
 
 import (
 	"encoding/json"

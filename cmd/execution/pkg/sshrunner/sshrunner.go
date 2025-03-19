@@ -1,4 +1,4 @@
-package main
+package sshrunner
 
 import (
 	"bufio"
@@ -16,7 +16,7 @@ type SSHJob struct {
     HostID      int
     ScriptID    int
     UUID        uuid.UUID
-    dataCh    chan string
+    DataCh    chan string
 }
 
 type SSHConfig struct {
@@ -220,7 +220,7 @@ func FetchRemoteData(jb SSHJob) error {
     sshExecCfg := configs[jb.HostID]
     
     go runRemoteScript(sshExecCfg, outputCh, doneCh, &result)
-    go handleOutput(outputCh, jb.dataCh, doneCh, &result)
+    go handleOutput(outputCh, jb.DataCh, doneCh, &result)
     
     <-doneCh
     <-doneCh
