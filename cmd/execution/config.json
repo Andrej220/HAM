@@ -3,18 +3,24 @@
         "ip": "192.168.1.105:22",
         "username": "master",
         "password": "nekochegar",
-        "script": "echo host 0 && echo error >&2; sleep 2"
+        "script": "echo host 0 && ip a && echo error >&2; sleep 2"
     },
     {
         "ip": "192.168.1.107:22",
         "username": "master",
         "password": "nekochegar",
-        "script": "echo 'host 1'; sleep 2"
+        "script": "echo 'host 1'&& ip a && echo error!!! >&2; sleep 2"
     },
     {
         "ip": "192.168.1.105:22",
         "username": "master",
         "password": "nekochegar",
-        "script": "echo 'Host 2'; sleep 2"
+        "script": "echo 'Host 2' && ip a; sleep 2"
+    },
+    {
+        "ip": "127.2.0.2:22",
+        "username": "andrey",
+        "password": "nasnedogonyat",
+        "script": "hostname && ip a; sleep 2"
     }
 ]
