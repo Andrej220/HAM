@@ -144,11 +144,12 @@ func main(){
 	mux := http.NewServeMux()
 	handler:=newExecutorHandler()
 	mux.Handle("/executor", newValidationHandler(handler))
+	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
 	// Configure server
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),
 		Handler:      mux,
-		ReadTimeout:  10 * time.Second,
+		ReadTimeout:  10 * time.Second,  // define constants or env vars
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
