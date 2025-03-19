@@ -67,8 +67,8 @@ type executorHandler struct{
 
 func newExecutorHandler() http.Handler {
 	h := executorHandler{}
-	h.pool = workerpool.NewPool[sshr.SSHJob](workerpool.MAXWORKERS)
-	h.dspool = workerpool.NewPool[dataservice.DSjobStruct](workerpool.MAXWORKERS)
+	h.pool = workerpool.NewPool[sshr.SSHJob](workerpool.TotalMaxWorkers)
+	h.dspool = workerpool.NewPool[dataservice.DSjobStruct](workerpool.TotalMaxWorkers)
 	return &h
 }
 
@@ -103,7 +103,7 @@ func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 
 	jb := workerpool.Job[sshr.SSHJob]{ 
 		Payload: sshJob,
-		Fn: sshr.FetchRemoteData,
+		Fn: sshr.RunJob,
 		Ctx: ctx,
 		CleanupFunc: func() {
 			if cancel, ok := h.cancelFuncs.Load(newUUID); ok {

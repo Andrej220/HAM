@@ -203,7 +203,7 @@ func handleOutput(inputCh chan Output, outChan chan string ,doneCh chan<- struct
     log.Println("End of data collection.")
 }
 
-func FetchRemoteData(jb SSHJob) error {
+func RunJob(jb SSHJob) error {
     outputCh := make(chan Output, MAXLINES)
     doneCh := make(chan struct{}, 2)
 

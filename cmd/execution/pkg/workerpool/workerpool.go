@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"context"
 )
-const MAXWORKERS = 100
+const TotalMaxWorkers = 100
 
 type JobFunc[T any] func(T) error
 
@@ -27,7 +27,7 @@ type Pool[T any] struct {
 
 func NewPool[T any](maxWorkers int) *Pool[T] {
 	if maxWorkers <= 0 {
-		maxWorkers = MAXWORKERS
+		maxWorkers = TotalMaxWorkers
 	}
 	pool := &Pool[T]{
 		Jobs:  make(chan Job[T], maxWorkers), 
