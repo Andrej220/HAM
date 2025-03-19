@@ -16,7 +16,7 @@ type DSjobStruct struct {
 
 func WriteFile(job DSjobStruct) error{
 
-	filename := fmt.Sprintf("job_%s",job.UUID)
+	filename := fmt.Sprintf("/tmp/job_%s",job.UUID)
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err!= nil{
 		log.Printf("Failed to create filename %s", err)
