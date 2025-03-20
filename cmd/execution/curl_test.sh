@@ -1,6 +1,14 @@
-echo "Start testing API service."
-curl localhost:8081/executor -d '{"hostid":0,"scriptid":1}'
-curl localhost:8081/executor -d '{"hostid":1,"scriptid":1}'
-curl localhost:8081/executor -d '{"hostid":2,"scriptid":1}'
+#!/bin/bash
+date
+echo "Start high-load testing"
 
-echo "Stop testing"
+
+for i in {0..30000}; do
+    hostid=$((i % 4)) #
+    curl -s localhost:8081/executor -d "{\"hostid\":$hostid,\"scriptid\":1}" > /dev/null &
+done
+
+
+wait
+date
+echo "Stop high-load testing"
