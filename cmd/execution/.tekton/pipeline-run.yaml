@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: ham-deploy-run
+spec:
+  pipelineRef:
+    name: ham-deploy-pipeline
+  params:
+    - name: ssh-executor-image-repo
+      value: "https://github.com/Andrej220/HAM.git"
+    - name: gitops-repo
+      value: "git@github.com:Andrej220/HAM-gitops.git"
+    - name: image-name
+      value: "local-registry.registry.svc.cluster.local:5000/executor:latest"
+  workspaces:
+    - name: shared-data
+      volumeClaimTemplate:
+        metadata:
+          name: pipeline-workspace
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

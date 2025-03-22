@@ -1,0 +1,29 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-and-push
+spec:
+  params:
+    - name: git-url
+      type: string
+      description: "Git repository URL of the nginx-image repo"
+    - name: image-name
+      type: string
+      description: "Docker image name including registry"
+  workspaces:
+    - name: source
+  steps:
+    - name: clone-repo
+      image: alpine/git
+      script: |
+        #!/bin/sh
+        set -ex
+        git clone "$(params.git-url)" /workspace/source
+    - name: build-and-push
+      image: gcr.io/kaniko-project/executor:latest
+      args:
+        - --context=/workspace/source/cmd/execution
+        - --destination=$(params.image-name)
+        - --digest-file=/workspace/source/digest.txt
+        - --cache=true
+        - --verbosity=debug
