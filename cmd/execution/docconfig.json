@@ -1,0 +1,36 @@
+{
+  "version": "1.0",
+  "remote_host": "user@remote.example.com",
+  "structure": {
+    "system": {
+      "type": "object",
+      "fields": {
+        "cpu": {
+          "type": "string",
+          "script": "cat /proc/cpuinfo | grep 'model name' | head -n1 | cut -d':' -f2-",
+          "post_process": "trim"
+        },
+        "memory": {
+          "type": "string",
+          "script": "free -h | grep 'Mem:' | awk '{print $2}'",
+          "post_process": "trim"
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "fields": {
+        "disks": {
+          "type": "array",
+          "script": "df -h | tail -n +2 | awk '{print $1 \":\" $2}'",
+          "post_process": "split_lines"
+        }
+      }
+    },
+    "uptime": {
+      "type": "string",
+      "script": "uptime -p",
+      "post_process": "trim"
+    }
+  }
+}
