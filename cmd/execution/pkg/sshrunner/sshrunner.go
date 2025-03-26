@@ -2,12 +2,16 @@ package sshrunner
 
 import (
 	"bufio"
+	"context"
 	"fmt"
+	"io"
+	"log"
+	"strings"
+	"sync"
 	"time"
-    "log"
+
+	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
-    "github.com/google/uuid"
-    "io"
 )
 
 const MAXLINES = 50
@@ -16,219 +20,186 @@ type SSHJob struct {
     HostID      int
     ScriptID    int
     UUID        uuid.UUID
-    DataCh    chan string
+    Ctx         context.Context
 }
 
-type SSHConfig struct {
-	IP          string
-	Username    string
-	Password    string
-	Script      string
+type task struct{
+    node    *Node
+    client  *ssh.Client
+    ctx     context.Context
 }
 
-type OutputHandler interface {
-    Process(line string) error
-    Source() string
-}
-
-type ExecResults struct {
-    StdoutLines []string
-    StderrLines []string
-    Errors      []string
-}
-
-type StdoutHandler struct {
-    data *ExecResults
-}
-
-func (h *StdoutHandler) Process(line string) error {
-    h.data.StdoutLines = append(h.data.StdoutLines, line)
-    return nil
-}
-
-func (h *StdoutHandler) Source() string {
-    return "stdout"
-}
-
-type StderrHandler struct {
-    data *ExecResults
-}
-
-func (h *StderrHandler) Process(line string) error {
-    h.data.StderrLines = append(h.data.StderrLines, line)
-    return nil
-}
-
-func (h *StderrHandler) Source() string {
-    return "stderr"
-}
-
-type ErrorHandler struct {
-    data *ExecResults
-}
-
-func (h *ErrorHandler) Process(line string) error {
-    h.data.Errors = append(h.data.Errors, line)
-    return nil
-}
-
-func (h *ErrorHandler) Source() string {
-    return "error"
-}
-
-type Output struct {
-    Handler OutputHandler
-    Line    string
-}
-
-func readOutput(reader io.Reader, outputCh chan<- Output, handler OutputHandler, scanDoneCh chan<- struct{}) {
-    defer func() { scanDoneCh <- struct{}{} }()
-    scanner := bufio.NewScanner(reader)
-    for scanner.Scan() {
-        outputCh <- Output{Handler: handler, Line: scanner.Text()}
-    }
-    if err := scanner.Err(); err != nil {
-        outputCh <- Output{Handler: handler, Line: fmt.Sprintf("%s scan error: %v", handler.Source(), err)}
-    }
-}
-
-func newSSHSession(execConfig SSHConfig) (*ssh.Client, *ssh.Session, error){
+func newSSHClient(execConfig *DocConfig) (*ssh.Client,  error){
     log.Println("Connecting to SSH server")
     
+    // TODO: just for the test 
+    // change it for production
     config := &ssh.ClientConfig{
-        User: execConfig.Username,
+        User: execConfig.Login,
         Auth: []ssh.AuthMethod{ssh.Password(execConfig.Password)},
         HostKeyCallback: ssh.InsecureIgnoreHostKey(),
         Timeout:          10 * time.Second,
     }
     
-    client, err := ssh.Dial("tcp", execConfig.IP, config)
+    client, err := ssh.Dial("tcp", execConfig.RemoteHost, config)
     if err != nil {
-        return nil, nil, fmt.Errorf("failed to dial  %w", err)
+        return nil,  fmt.Errorf("failed to dial  %w", err)
     }
     
-    log.Printf("SSH connection established to %s. Creating session...",execConfig.IP)
+    log.Printf("SSH connection established to %s. ",execConfig.RemoteHost)
 
-    session, err := client.NewSession()
-    if err != nil {
-        return nil, nil, fmt.Errorf("failed to create session: %w",err)
-    }
-
-    log.Printf("Session is created: %s",execConfig.IP)
-
-    return client, session, nil
+    return client,  nil
 }
 
-func runRemoteScript(execConfig SSHConfig, outputCh chan<- Output, doneCh chan<- struct{}, data *ExecResults) {
-    defer close(outputCh)
-    defer func() { doneCh <- struct{}{} }()
-    
-    streams := struct {
-        Stdout OutputHandler
-        Stderr OutputHandler
-        Error  OutputHandler
-    }{
-        Stdout: &StdoutHandler{data},
-        Stderr: &StderrHandler{data},
-        Error:  &ErrorHandler{data},
+func RunJob(jb SSHJob) error{
+
+    jobcfg,err := LoadCfg("docconfig.json")
+    if err != nil{
+        log.Printf("Error reading configuration %v:", err)
+        return err
+    }
+    // Create connection, return 
+    client, err := newSSHClient(jobcfg)
+    if err != nil{
+        log.Printf("Error connection remote host: %+v", err)
+        return err
+    }
+    defer client.Close()
+
+    var wg sync.WaitGroup
+    for node :=jobcfg.Head; node != nil; node = node.Next{
+        t := task{node:node,client: client, ctx:jb.Ctx}
+        wg.Add(1)
+        go runTask(&t, &wg)
+    }
+    wg.Wait()
+    // for the test only
+    WriteJson(jobcfg, "/tmp/test.json")
+    return nil
+}
+
+// Add error propagation 
+func runTask(t *task, wg *sync.WaitGroup) {
+    defer wg.Done()
+
+    select {
+    case <-t.ctx.Done():
+        log.Printf("Task canceled before start: %v", t.ctx.Err())
+        return
+    default:
     }
 
-    client, session, err := newSSHSession(execConfig)
+    session, err := t.client.NewSession()
     if err != nil {
-        outputCh <- Output{Handler: streams.Error, Line: fmt.Sprintf("failed to establish connection: %+v", err)}
+        log.Printf("failed to create session: %+v",err)
         return 
     }
-    
-    defer client.Close()
     defer session.Close()
+
+    log.Printf("Session is created: %s",t.client.RemoteAddr())
 
     stdout, err := session.StdoutPipe()
     if err != nil {
-        outputCh <- Output{Handler: streams.Error, Line: fmt.Sprintf("Failed to get stdout pipe: %+v", err)}
+        log.Printf("Failed to get stdout pipe: %+v", err)
         return
     }
 
     stderr, err := session.StderrPipe()
     if err != nil {
-        outputCh <- Output{Handler: streams.Error, Line: fmt.Sprintf("Failed to get stderr pipe: %+v", err)}
+        log.Printf("Failed to get stderr pipe: %+v", err)
         return
     }
 
     log.Println("Executing script.")
-    err = session.Start( execConfig.Script)
+    err = session.Start( t.node.Script)
     if err != nil {
-        fmt.Println(execConfig.Script)
-        outputCh <- Output{Handler: streams.Error, Line: fmt.Sprintf("Failed to start script: %v", err)}
+        log.Printf("Failed to start script: %v", err)
         return
     }
 
-    scanDoneCh := make(chan struct{}, 2)
-
     log.Println("Start reading stdout.")
-    go readOutput(stdout, outputCh, streams.Stdout, scanDoneCh)
-    go readOutput(stderr, outputCh, streams.Stderr, scanDoneCh)
 
-    if err := session.Wait(); err != nil {
-        outputCh <- Output{Handler: streams.Error, Line: fmt.Sprintf("Script execution error: %v", err)}
-    }
+    // run them as goroutines
+    var res []string
+    res = readOutput(stdout, t.ctx)
+    t.node.Stderr = readOutput(stderr, t.ctx)
+    t.node.Result = processOutput(res, t.node.PostProcess, t.node.Type)
 
-    <-scanDoneCh
-    <-scanDoneCh
-    log.Println("Script execution and stdout reading completed.")
-}
-
-func handleOutput(inputCh chan Output, outChan chan string ,doneCh chan<- struct{},data *ExecResults){
-    defer func() { doneCh <- struct{}{} }()
-    log.Println("Collecting data...")
-    for output := range inputCh {
-        // pass data only if stdout and outChan is set
-        // TODO: case for type assertion
-        //switch v := i.(type) {
-        //case int:
-        //    fmt.Println("i is an int:", v)
-        //case string:
-        //    fmt.Println("i is a string:", v)
-        //case float64:
-        //    fmt.Println("i is a float64:", v)
-        //default:
-        //    fmt.Printf("i is of an unknown type: %T\n", v)
-        //}
-        if _,ok := output.Handler.(*StdoutHandler); ok && outChan != nil{
-            outChan <- output.Line + "\n"
-        }
-        if err := output.Handler.Process(output.Line); err!=nil{
-            data.Errors = append(data.Errors, fmt.Sprintf("Processing %s: %v", output.Handler.Source(), err))
+    select {
+    case <-t.ctx.Done():
+        log.Printf("Task canceled before wait: %v", t.ctx.Err())
+        return
+    default:
+        if err := session.Wait(); err != nil {
+            log.Printf("Script execution error: %v", err)
         }
     }
-    log.Println("End of data collection.")
 }
 
-func RunJob(jb SSHJob) error {
-    outputCh := make(chan Output, MAXLINES)
-    doneCh := make(chan struct{}, 2)
 
-    result := ExecResults{}
-    
-// TEST config, should be fetched from DB
-    configs,err := LoadConfigs()
-    if err != nil{
-        log.Printf("Error reading configuration %v:", err)
-        return err
+
+func readOutput(reader io.Reader, ctx  context.Context) []string {
+    var lines []string
+    scanner := bufio.NewScanner(reader)
+    for scanner.Scan() {
+        select {
+        case <-ctx.Done():
+            log.Printf("Output reading canceled: %v", ctx.Err())
+            return nil
+        default:
+            lines = append(lines, scanner.Text())
+        }
     }
-//!!!!!!!!!!!!!!!
-
-    sshExecCfg := configs[jb.HostID]
-    
-    go runRemoteScript(sshExecCfg, outputCh, doneCh, &result)
-    go handleOutput(outputCh, jb.DataCh, doneCh, &result)
-    
-    <-doneCh
-    <-doneCh
-
-    log.Println("Script execution and data collection completed.")
-    //TODO: send data to pareser, return
-    fmt.Println("Stdout:", result.StdoutLines)
-    fmt.Println("Stderr:", result.StderrLines)
-    fmt.Println("Errors:", result.Errors)
-    return nil
+    if err := scanner.Err(); err != nil {
+        log.Printf("Scan error: %v", err)
+    }
+    return lines
 }
+
+func processOutput(lines []string, postProcess string, nodeType string) any {
+    if len(lines) == 0 {
+        return nil 
+    }
+    switch postProcess {
+    case "trim":
+        if nodeType == "string" {
+            return strings.TrimSpace(strings.Join(lines, "\n"))
+        }
+        trimmed := make([]string, 0, len(lines))
+        for _, line := range lines {
+            trimmed = append(trimmed, strings.TrimSpace(line))
+        }
+        return trimmed 
+    case "split_lines":
+        fmt.Println(nodeType, postProcess)
+        if nodeType == "array" {
+            var result []string
+            for _, line := range lines {
+                fields := strings.Fields(line) 
+                result = append(result, fields...)
+            }
+            return result
+        }
+        return strings.Join(lines,  "\n")
+    default:
+        return lines 
+    }
+}
+
+//func readOutput(reader io.Reader, t *task) {
+//    var lines []string
+//    scanner := bufio.NewScanner(reader)
+//    for scanner.Scan() {
+//        select {
+//        case <-t.ctx.Done():
+//            log.Printf("Output reading canceled: %v", t.ctx.Err())
+//            return
+//        default:
+//            lines = append(lines, scanner.Text())
+//        }
+//    }
+//    if err := scanner.Err(); err != nil {
+//        log.Printf("Scan error: %v", err)
+//    }
+//    t.node.Result = processOutput(lines, t.node.PostProcess)
+//}

@@ -1,18 +1,20 @@
 {
   "version": "1.0",
-  "remote_host": "user@remote.example.com",
+  "remote_host": "192.168.1.105:22",
+  "password": "nekochegar",
+  "login":"master",
   "structure": {
     "system": {
       "type": "object",
       "fields": {
         "cpu": {
           "type": "string",
-          "script": "cat /proc/cpuinfo | grep 'model name' | head -n1 | cut -d':' -f2-",
+          "script": "cat /proc/cpuinfo | head  -n 2 ; sleep 5;",
           "post_process": "trim"
         },
         "memory": {
-          "type": "string",
-          "script": "free -h | grep 'Mem:' | awk '{print $2}'",
+          "type": "array",
+          "script": "free -h ; sleep 5",
           "post_process": "trim"
         }
       }
@@ -22,14 +24,14 @@
       "fields": {
         "disks": {
           "type": "array",
-          "script": "df -h | tail -n +2 | awk '{print $1 \":\" $2}'",
-          "post_process": "split_lines"
+          "script": "df -h ; sleep 2",
+          "post_process": "trim"
         }
       }
     },
     "uptime": {
       "type": "string",
-      "script": "uptime -p",
+      "script": "uptime -p; sleep 2;echo 'error, command not found' >2",
       "post_process": "trim"
     }
   }

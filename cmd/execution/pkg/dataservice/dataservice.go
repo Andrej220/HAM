@@ -1,9 +1,11 @@
-package dataservice
+package dataservice 
 
 import (
 	"fmt"
 	"log"
 	"os"
+
+	//"github.com/chromedp/cdproto/headlessexperimental"
 	"github.com/google/uuid"
 )
 
@@ -34,3 +36,4 @@ func WriteFile(job DSjobStruct) error{
 	log.Printf("Successfully saved on disk: %+v", job)
 	return nil
 }
+

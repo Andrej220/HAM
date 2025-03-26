@@ -80,25 +80,14 @@ func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 		return
 	}
 	
-	ctx, cancel := context.WithTimeout(r.Context(), MAXTIMEOUT )
-	//TODO: get results and store them in DB
-	//Connect ot a remote host and fetch data
+	ctx, cancel := context.WithTimeout(context.Background(), MAXTIMEOUT )
 	newUUID := uuid.New()
-
-	dataCh := make(chan string, 100)  // pipe to save data in a file
 
 	sshJob := sshr.SSHJob{
 		HostID: request.HostID, 
 		ScriptID: request.ScriptID, 
 		UUID: newUUID,
-		DataCh: dataCh,
-	}
-
-	dsJob := dataservice.DSjobStruct{
-		HostID: request.HostID, 
-		ScriptID: request.ScriptID, 
-		UUID: newUUID,
-		DataChan: dataCh,
+		Ctx: ctx,
 	}
 
 	jb := workerpool.Job[sshr.SSHJob]{ 
@@ -113,20 +102,9 @@ func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 		},
 	}
 
-	dsWPJob := workerpool.Job[dataservice.DSjobStruct]{
-		Payload: dsJob,
-		Fn: dataservice.WriteFile,
-		Ctx: ctx,
-	}
-
 	h.cancelFuncs.Store(newUUID,cancel)
-
 	h.pool.Submit(jb)
-	h.dspool.Submit(dsWPJob)
-
 	response := executorResponse{ ExecutionUID: newUUID}
-	//
-	//TODO: in goroutine save data to a file or DB
 
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)

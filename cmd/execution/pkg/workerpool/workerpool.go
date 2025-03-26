@@ -6,14 +6,14 @@ import (
 	"sync/atomic"
 	"context"
 )
-const TotalMaxWorkers = 100
+const TotalMaxWorkers = 10
 
 type JobFunc[T any] func(T) error
 
 type Job[T any] struct{
-	Payload T
-	Fn		JobFunc[T]
-	Ctx	context.Context
+	Payload 	T
+	Fn			JobFunc[T]
+	Ctx			context.Context
 	CleanupFunc func()
 }
 
