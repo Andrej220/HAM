@@ -25,6 +25,7 @@ type SSHJob struct {
 type task struct{
     node    *Node
     client  *ssh.Client
+    session *ssh.Session
     ctx     context.Context
 }
 
@@ -88,8 +89,16 @@ func RunJob(jb SSHJob) error{
 func runTask(t *task) error {
 
     // skip if object (no script to execute)
-    if t.node.Type == "object"{
+    if t.node.Type == "object" || len(t.node.Script) == 0{
         return nil
+    }
+ 
+    if t.session == nil {
+        session, err := t.client.NewSession()
+        if err != nil {
+            return fmt.Errorf("session creation failed: %w", err)
+        }
+        t.session = session
     }
 
     select {
@@ -99,33 +108,30 @@ func runTask(t *task) error {
     default:
     }
 
-    session, err := t.client.NewSession()
-    if err != nil {
-        log.Printf("failed to create session: %+v",err)
-        return err
-    }
-    defer session.Close()
+    defer func() {
+        if t.ctx.Err() != nil || t.node == nil {
+            t.session.Close()
+            t.session = nil
+        }
+    }()
+
 
     log.Printf("Session is created: %s",t.client.RemoteAddr())
 
-    stdout, err := session.StdoutPipe()
+    stdout, err := t.session.StdoutPipe()
     if err != nil {
         log.Printf("Failed to get stdout pipe: %+v", err)
         return err
     }
 
-    stderr, err := session.StderrPipe()
+    stderr, err := t.session.StderrPipe()
     if err != nil {
         log.Printf("Failed to get stderr pipe: %+v", err)
         return err
     }
 
-    if len(t.node.Script) == 0 {
-        return nil
-    }
-
     log.Println("Executing script.")
-    err = session.Start( t.node.Script )
+    err = t.session.Start( t.node.Script )
     if err != nil {
         log.Printf("Failed to start script: %v", err)
         return err
@@ -144,8 +150,8 @@ func runTask(t *task) error {
         log.Printf("Task canceled before wait: %v", t.ctx.Err())
         return t.ctx.Err()
     default:
-        if err := session.Wait(); err != nil {
-            log.Printf("Script execution error: %v", err)
+        if err := t.session.Wait(); err != nil {
+            log.Printf("Script error: %v", err)
         }
     }
     return nil
