@@ -1,38 +1,47 @@
 {
-  "version": "1.0",
-  "remote_host": "192.168.1.105:22",
-  "password": "nekochegar",
-  "login":"master",
-  "structure": {
-    "system": {
-      "type": "object",
-      "fields": {
-        "cpu": {
-          "type": "string",
-          "script": "cat /proc/cpuinfo | head  -n 2 ; sleep 5;",
-          "post_process": "trim"
+    "version": "1.0",
+    "remote_host": "192.168.1.105:22",
+    "password": "nekochegar",
+    "login": "master",
+    "structure": {
+      "id": "root",
+      "children": [
+        {
+          "id": "system",
+          "type": "object",
+          "children": [
+            {
+              "id": "cpu",
+              "type": "string",
+              "script": "cat /proc/cpuinfo | head -n 2 ; sleep 5;",
+              "post_process": "trim"
+            },
+            {
+              "id": "memory",
+              "type": "array",
+              "script": "free -h ; sleep 5",
+              "post_process": "trim"
+            }
+          ]
         },
-        "memory": {
-          "type": "array",
-          "script": "free -h ; sleep 5",
+        {
+          "id": "storage",
+          "type": "object",
+          "children": [
+            {
+              "id": "disks",
+              "type": "array",
+              "script": "df -h ; sleep 2",
+              "post_process": "trim"
+            }
+          ]
+        },
+        {
+          "id": "uptime",
+          "type": "string",
+          "script": "uptime -p; sleep 2;lskdjfl",
           "post_process": "trim"
         }
-      }
-    },
-    "storage": {
-      "type": "object",
-      "fields": {
-        "disks": {
-          "type": "array",
-          "script": "df -h ; sleep 2",
-          "post_process": "trim"
-        }
-      }
-    },
-    "uptime": {
-      "type": "string",
-      "script": "uptime -p; sleep 2;echo 'error, command not found' >2",
-      "post_process": "trim"
+      ]
     }
   }
-}
