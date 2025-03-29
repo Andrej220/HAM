@@ -68,7 +68,7 @@ func NewGraphFromJSON(filePath string) (*Graph, error) {
 }
 
 func (g *Graph) NodeGenerator() <-chan *Node {
-	ch := make(chan *Node)
+	ch := make(chan *Node, 100)
 	go func() {
 		defer close(ch)
 		g.traverseDFS(g.Root, ch)
