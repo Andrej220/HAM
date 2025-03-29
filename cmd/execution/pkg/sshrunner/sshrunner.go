@@ -73,7 +73,10 @@ func RunJob(jb SSHJob) error{
 		wg.Add(1)
 		go func(n *Node) {
 			defer wg.Done()
-            runTask(&t)
+            err = runTask(&t)
+            if err != nil{
+                log.Printf("Task execution failed: %+v", err)
+            }
 		}(node)
 	}
     wg.Wait()
@@ -82,24 +85,24 @@ func RunJob(jb SSHJob) error{
 }
 
 // Add error propagation 
-func runTask(t *task) {
+func runTask(t *task) error {
 
     // skip if object (no script to execute)
     if t.node.Type == "object"{
-        return 
+        return nil
     }
 
     select {
     case <-t.ctx.Done():
         log.Printf("Task canceled before start: %v", t.ctx.Err())
-        return
+        return t.ctx.Err()
     default:
     }
 
     session, err := t.client.NewSession()
     if err != nil {
         log.Printf("failed to create session: %+v",err)
-        return 
+        return err
     }
     defer session.Close()
 
@@ -108,24 +111,24 @@ func runTask(t *task) {
     stdout, err := session.StdoutPipe()
     if err != nil {
         log.Printf("Failed to get stdout pipe: %+v", err)
-        return
+        return err
     }
 
     stderr, err := session.StderrPipe()
     if err != nil {
         log.Printf("Failed to get stderr pipe: %+v", err)
-        return
+        return err
     }
 
     if len(t.node.Script) == 0 {
-        return
+        return nil
     }
 
     log.Println("Executing script.")
     err = session.Start( t.node.Script )
     if err != nil {
         log.Printf("Failed to start script: %v", err)
-        return
+        return err
     }
 
     log.Println("Start reading stdout.")
@@ -139,12 +142,13 @@ func runTask(t *task) {
     select {
     case <-t.ctx.Done():
         log.Printf("Task canceled before wait: %v", t.ctx.Err())
-        return
+        return t.ctx.Err()
     default:
         if err := session.Wait(); err != nil {
             log.Printf("Script execution error: %v", err)
         }
     }
+    return nil
 }
 
 func readOutput(reader io.Reader, ctx  context.Context) []string {
