@@ -5,8 +5,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"context"
+	"time"
+	"fmt"
 )
-const TotalMaxWorkers = 10
+const (
+	TotalMaxWorkers = 10
+	maxAttemps		= 3
+)
 
 type JobFunc[T any] func(T) error
 
@@ -81,8 +86,18 @@ func (p *Pool[T]) worker(job Job[T]) {
 	doneCh := make(chan error, 1)
 
 	go func() {
-		doneCh <- job.Fn(job.Payload)
+		var err error
+		for attempt := 1; attempt <= maxAttemps; attempt++ {
+			err = job.Fn(job.Payload)
+			if err == nil {
+				doneCh <- nil
+				return
+			}
+			time.Sleep(time.Duration(attempt) * time.Second)
+		}
+		doneCh <- fmt.Errorf("failed after 3 attempts: %w", err)
 	}()
+
 
 	select {
 	case <-job.Ctx.Done():
