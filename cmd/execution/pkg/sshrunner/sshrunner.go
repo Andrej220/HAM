@@ -13,7 +13,10 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const MAXLINES = 50
+const (
+        MAXLINES = 50
+        maxConcurrent = 7
+    )
 
 type SSHJob struct {
     HostID      int
@@ -51,6 +54,14 @@ func newSSHClient(remote string, login string, password string ) (*ssh.Client,  
     return client,  nil
 }
 
+func newSSHSession(client *ssh.Client) (*ssh.Session, error) {
+	session, err := client.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("session creation failed: %w", err)
+	}
+	return session, nil
+}
+
 func RunJob(jb SSHJob) error{
 
     graph, err := NewGraphFromJSON("docconfig.json")
@@ -66,22 +77,47 @@ func RunJob(jb SSHJob) error{
         return err
     }
     defer client.Close()
-	
+
     nodeChan := graph.NodeGenerator()
     var wg sync.WaitGroup	
+    errs := make(chan error, len(nodeChan)) 
+    taskChan := make(chan struct{}, maxConcurrent) // Semaphore, limits concurent workers
+
     for node := range nodeChan {
-        t := task{node:node,client: client, ctx:jb.Ctx}
+        taskChan <- struct{}{}      //take a slot for the task
+        session, err := newSSHSession(client)
+        if err != nil {
+			log.Printf("Failed to create session for node %v: %v", node, err)
+            <- taskChan //release slot dues to failure
+            errs <- err
+			continue 
+		}
+
+        t := task{node:node,client: client, ctx:jb.Ctx, session: session}
 		wg.Add(1)
 		go func(n *Node) {
 			defer wg.Done()
+            defer t.session.Close()
+            defer func(){ <-taskChan}() //release task slot
+
             err = runTask(&t)
             if err != nil{
+                errs <- err
                 log.Printf("Task execution failed: %+v", err)
             }
 		}(node)
 	}
     wg.Wait()
-    WriteJson(graph, "/tmp/test.json")
+    close(errs)
+
+	for err := range errs {
+		if err != nil {
+			return fmt.Errorf("one or more tasks failed: %v", err)
+		}
+	}
+
+    //test only 
+    //WriteJson(graph, "/tmp/test.json")
     return nil
 }
 
@@ -92,13 +128,9 @@ func runTask(t *task) error {
     if t.node.Type == "object" || len(t.node.Script) == 0{
         return nil
     }
- 
+
     if t.session == nil {
-        session, err := t.client.NewSession()
-        if err != nil {
-            return fmt.Errorf("session creation failed: %w", err)
-        }
-        t.session = session
+        return fmt.Errorf("Error, session has not been created: %s", t.client.RemoteAddr())
     }
 
     select {
@@ -108,15 +140,7 @@ func runTask(t *task) error {
     default:
     }
 
-    defer func() {
-        if t.ctx.Err() != nil || t.node == nil {
-            t.session.Close()
-            t.session = nil
-        }
-    }()
-
-
-    log.Printf("Session is created: %s",t.client.RemoteAddr())
+    log.Printf("Session is created for %s", t.client.RemoteAddr())
 
     stdout, err := t.session.StdoutPipe()
     if err != nil {
