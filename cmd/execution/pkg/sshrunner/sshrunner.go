@@ -42,6 +42,7 @@ func newSSHClient(remote string, login string, password string ) (*ssh.Client,  
         Auth: []ssh.AuthMethod{ssh.Password(password)},
         HostKeyCallback: ssh.InsecureIgnoreHostKey(),
         Timeout:          10 * time.Second,
+        BannerCallback: func(message string) error {return nil},  //ignore banner
     }
     
     client, err := ssh.Dial("tcp", remote, config)
