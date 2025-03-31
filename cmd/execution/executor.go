@@ -2,7 +2,7 @@ package main
 
 import (
 	"executor/pkg/workerpool"
-	"executor/pkg/dataservice"
+	//"executor/pkg/dataservice"
 	sshr "executor/pkg/sshrunner"
 	//"compress/gzip"
 	"encoding/json"
@@ -61,14 +61,12 @@ func (h validationHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 
 type executorHandler struct{
 	pool *workerpool.Pool[sshr.SSHJob]
-	dspool *workerpool.Pool[dataservice.DSjobStruct]
 	cancelFuncs sync.Map
 }
 
 func newExecutorHandler() http.Handler {
 	h := executorHandler{}
 	h.pool = workerpool.NewPool[sshr.SSHJob](workerpool.TotalMaxWorkers)
-	h.dspool = workerpool.NewPool[dataservice.DSjobStruct](workerpool.TotalMaxWorkers)
 	return &h
 }
 
