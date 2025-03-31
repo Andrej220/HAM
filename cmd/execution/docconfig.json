@@ -13,8 +13,8 @@
             {
               "id": "cpu",
               "type": "string",
-              "script": "cat /proc/cpuinfo | head -n 2 ; sleep 5;",
-              "post_process": "trim"
+              "script": "lscpu ; sleep 5;",
+              "post_process": "key_value"
             },
             {
               "id": "memory",
