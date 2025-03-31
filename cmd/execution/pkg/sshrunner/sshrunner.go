@@ -11,6 +11,7 @@ import (
 	"time"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
+    ds "executor/pkg/dataservice"
 )
 
 const (
@@ -120,7 +121,7 @@ func RunJob(jb SSHJob) error{
 		return fmt.Errorf("one or more tasks failed, first error: %v", errors[0])
 	}
     //test only 
-    WriteJson(graph, "/tmp/test.json")
+    ds.WriteFile(graph.Root, "/tmp/test.json")
     return nil
 }
 
