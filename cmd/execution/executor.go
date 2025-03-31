@@ -19,7 +19,7 @@ import (
 	"sync"
 )
 
-const MAXTIMEOUT time.Duration = 5*time.Minute
+const MAXTIMEOUT time.Duration = 1*time.Minute
 
 type executorResponse struct{
 	ExecutionUID uuid.UUID `json:"exuid"`
