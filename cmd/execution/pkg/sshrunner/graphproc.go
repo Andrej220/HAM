@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"log"
 )
 
 type Node struct {
@@ -102,25 +101,4 @@ func (g *Graph) ProcessNodes() error {
 	}
 	wg.Wait()
 	return nil
-}
-
-func WriteJson(g *Graph, filename string) error{
-    file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
-    if err != nil {
-        log.Printf("Failed to open file %s: %v", filename, err)
-        return err
-    }
-    defer file.Close()
-
-    data, err := json.MarshalIndent(g.Root, "", "  ") 
-    if err != nil {
-        log.Printf("Failed to marshal node to JSON: %v", err)
-        return err
-    }
-
-    if _, err := file.Write(data); err != nil {
-        log.Printf("Failed to write JSON to file %s: %v", filename, err)
-        return err
-    }
-    return nil
 }

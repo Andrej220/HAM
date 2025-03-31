@@ -1,39 +1,46 @@
 package dataservice 
 
 import (
-	"fmt"
-	"log"
 	"os"
-
-	//"github.com/chromedp/cdproto/headlessexperimental"
-	"github.com/google/uuid"
+	"encoding/json"
+	"path/filepath"
 )
 
-type DSjobStruct struct {
-    HostID      int
-    ScriptID    int
-    UUID        uuid.UUID
-	DataChan	chan string
+type Options struct {
+    Overwrite bool
+    Prefix    string
+    Indent    string
 }
 
-func WriteFile(job DSjobStruct) error{
+func WriteFile(data any, filename string, opts ...Options) error{
 
-	filename := fmt.Sprintf("/tmp/job_%s",job.UUID)
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err!= nil{
-		log.Printf("Failed to create filename %s", err)
-		return err
-	}
-	defer file.Close()
+	opt := Options{
+        Overwrite: true,
+        Prefix:    "",
+        Indent:    "    ",
+    }
 
-	for line := range job.DataChan {
-		_, err := file.WriteString(line)
-		if err !=  nil {
-			log.Printf("Failed to write to file: %s", err)
-			return err
-		}
-	}
-	log.Printf("Successfully saved on disk: %+v", job)
-	return nil
+    if len(opts) > 0 {
+        opt = opts[0]
+    }
+
+	if filename == "" {
+        return os.ErrInvalid
+    }
+
+	if _, err := os.Stat(filename); !os.IsNotExist(err) && !opt.Overwrite {
+        return os.ErrExist
+    }
+
+    err := os.MkdirAll(filepath.Dir(filename), 0755)
+    if err != nil {
+        return err
+    }
+
+    jsonBytes, err := json.MarshalIndent(data, opt.Prefix, opt.Indent)
+    if err != nil {
+        return err
+    }
+    return  os.WriteFile(filename, jsonBytes, 0644)
 }
 
