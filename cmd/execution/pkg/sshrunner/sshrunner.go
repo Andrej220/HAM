@@ -205,30 +205,43 @@ func readOutput(reader io.Reader, ctx  context.Context) []string {
 
 func processOutput(lines []string, postProcess string, nodeType string) []string {
     if len(lines) == 0 {
-        return nil 
+        return nil
     }
     switch postProcess {
     case "trim":
-        if nodeType == "string" {
-            return lines
-        }
         trimmed := make([]string, 0, len(lines))
         for _, line := range lines {
             trimmed = append(trimmed, strings.TrimSpace(line))
         }
-        return trimmed 
+        return trimmed
     case "split_lines":
-        fmt.Println(nodeType, postProcess)
         if nodeType == "array" {
             var result []string
             for _, line := range lines {
-                fields := strings.Fields(line) 
+                fields := strings.Fields(line)
                 result = append(result, fields...)
             }
             return result
         }
         return lines
+    case "key_value": 
+        if nodeType == "string" {
+            kv := make(map[string]string)
+            for _, line := range lines {
+                parts := strings.SplitN(strings.TrimSpace(line), ":", 2)
+                if len(parts) == 2 {
+                    kv[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+                }
+            }
+            // Convert to []string for consistency, e.g., ["processor: 0", "vendor_id: GenuineIntel"]
+            result := make([]string, 0, len(kv))
+            for k, v := range kv {
+                result = append(result, fmt.Sprintf("%s: %s", k, v))
+            }
+            return result
+        }
+        return lines
     default:
-        return lines 
+        return lines
     }
 }
