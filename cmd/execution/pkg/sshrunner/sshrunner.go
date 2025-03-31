@@ -81,8 +81,10 @@ func RunJob(jb SSHJob) error{
 
     nodeChan := graph.NodeGenerator()
     var wg sync.WaitGroup	
-    errs := make(chan error, len(nodeChan)) 
+
     taskChan := make(chan struct{}, maxConcurrent) // Semaphore, limits concurent workers
+	var mu sync.Mutex
+	var errors []error
 
     for node := range nodeChan {
         taskChan <- struct{}{}      //take a slot for the task
@@ -90,7 +92,9 @@ func RunJob(jb SSHJob) error{
         if err != nil {
 			log.Printf("Failed to create session for node %v: %v", node, err)
             <- taskChan //release slot dues to failure
-            errs <- err
+			mu.Lock()
+			errors = append(errors, err)
+			mu.Unlock()
 			continue 
 		}
 
@@ -103,22 +107,20 @@ func RunJob(jb SSHJob) error{
 
             err = runTask(&t)
             if err != nil{
-                errs <- err
+                mu.Lock()
+                errors = append(errors, err)
+                mu.Unlock()
                 log.Printf("Task execution failed: %+v", err)
             }
 		}(node)
 	}
     wg.Wait()
-    close(errs)
 
-	for err := range errs {
-		if err != nil {
-			return fmt.Errorf("one or more tasks failed: %v", err)
-		}
+	if len(errors) > 0 {
+		return fmt.Errorf("one or more tasks failed, first error: %v", errors[0])
 	}
-
     //test only 
-    //WriteJson(graph, "/tmp/test.json")
+    WriteJson(graph, "/tmp/test.json")
     return nil
 }
 
