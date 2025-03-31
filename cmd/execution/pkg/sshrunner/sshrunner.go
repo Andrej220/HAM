@@ -191,7 +191,7 @@ func readOutput(reader io.Reader, ctx  context.Context) []string {
         select {
         case <-ctx.Done():
             log.Printf("Output reading canceled: %v", ctx.Err())
-            return nil
+            return lines
         default:
             lines = append(lines, scanner.Text())
         }
