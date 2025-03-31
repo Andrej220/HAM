@@ -31,6 +31,7 @@ type alias struct {
 	Type        string   `json:"type,omitempty"`
 	Children    []*Node  `json:"fields,omitempty"`
 	Result      []string `json:"result,omitempty"`
+	Error		[]string `json:"error,omitempty"`
 }
 
 type Graph struct {
@@ -45,6 +46,7 @@ func (n *Node) MarshalJSON() ([]byte, error) {
 		Type:        n.Type,
 		Children:    n.Children,
 		Result:      n.Result,
+		Error:		 n.Stderr,
 	}
 
 	return json.Marshal(alias)
