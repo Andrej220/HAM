@@ -21,7 +21,7 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 COPY --from=builder /app/ssh-executor .
-COPY config.json .
+COPY docconfig.json .
 
 # Expose port
 EXPOSE 8081
