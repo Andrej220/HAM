@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
     ds "executor/pkg/dataservice"
+    "os"
 )
 
 const (
@@ -33,6 +34,20 @@ type task struct{
     ctx     context.Context
 }
 
+func publicKeyAuth(privateKeyPath string) ssh.AuthMethod {
+    key, err := os.ReadFile(privateKeyPath)
+    if err != nil {
+        log.Fatalf("unable to read private key: %v", err)
+    }
+
+    signer, err := ssh.ParsePrivateKey(key)
+    if err != nil {
+        log.Fatalf("unable to parse private key: %v", err)
+    }
+
+    return ssh.PublicKeys(signer)
+}
+
 func newSSHClient(remote string, login string, password string ) (*ssh.Client,  error){
     log.Println("Connecting to SSH server")
     
@@ -40,7 +55,8 @@ func newSSHClient(remote string, login string, password string ) (*ssh.Client,  
     // change it for production
     config := &ssh.ClientConfig{
         User: login,
-        Auth: []ssh.AuthMethod{ssh.Password(password)},
+        //Auth: []ssh.AuthMethod{ssh.Password(password)},
+        Auth: []ssh.AuthMethod{publicKeyAuth("/home/andrey/.ssh/myadminvps.ru")}, // TODO: move to main 
         HostKeyCallback: ssh.InsecureIgnoreHostKey(),
         Timeout:          10 * time.Second,
         BannerCallback: func(message string) error {return nil},  //ignore banner
@@ -121,11 +137,18 @@ func RunJob(jb SSHJob) error{
 		return fmt.Errorf("one or more tasks failed, first error: %v", errors[0])
 	}
     //test only 
-    ds.WriteFile(graph.Root, "/tmp/test.json")
+    //ds.WriteFile(graph.Root, "/tmp/test.json")
+    err = ds.SaveData(graph.Root)
+    if err != nil {
+        log.Printf("Error saving data: %+v", err)
+        return err
+    }
+    log.Printf("Data saved to MongoDB")
+    log.Printf("All tasks completed successfully")
     return nil
 }
 
-// Add error propagation 
+//TODO: Add error propagation 
 func runTask(t *task) error {
 
     // skip if object (no script to execute)
