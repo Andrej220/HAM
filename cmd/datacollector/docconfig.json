@@ -1,47 +1,57 @@
 {
-    "version": "1.0",
-    "remote_host": "77.83.86.216:22",
-    "password": "",
-    "login": "andrey",
-    "structure": {
-      "id": "root",
-      "children": [
-        {
-          "id": "system",
-          "type": "object",
-          "children": [
-            {
-              "id": "cpu",
-              "type": "string",
-              "script": "lscpu ; sleep 5;",
-              "post_process": "key_value"
-            },
-            {
-              "id": "memory",
-              "type": "array",
-              "script": "free -h ; sleep 5",
-              "post_process": "trim"
-            }
-          ]
-        },
-        {
-          "id": "storage",
-          "type": "object",
-          "children": [
-            {
-              "id": "disks",
-              "type": "array",
-              "script": "df -h ; sleep 2",
-              "post_process": "trim"
-            }
-          ]
-        },
-        {
-          "id": "uptime",
-          "type": "string",
-          "script": "uptime -p; sleep 2;lskdjfl",
-          "post_process": "trim"
-        }
-      ]
-    }
+  "scriptId": "script123",
+  "name": "SystemDiagnostics",
+  "version": "1.0",
+  "remote_host": "77.83.86.216:22",
+  "login": "andrey",
+  "password": "",
+  "structure": {
+    "id": "root",
+    "children": [
+      {
+        "id": "system",
+        "type": "object",
+        "children": [
+          {
+            "id": "cpu",
+            "type": "string",
+            "script": "lscpu ; sleep 5;",
+            "post_process": "key_value"
+          },
+          {
+            "id": "memory",
+            "type": "array",
+            "script": "free -h ; sleep 5",
+            "post_process": "trim"
+          }
+        ]
+      },
+      {
+        "id": "storage",
+        "type": "object",
+        "children": [
+          {
+            "id": "disks",
+            "type": "array",
+            "script": "df -h ; sleep 2",
+            "post_process": "trim"
+          }
+        ]
+      },
+      {
+        "id": "uptime",
+        "type": "string",
+        "script": "uptime -p; sleep 2",
+        "post_process": "trim"
+      }
+    ]
+  },
+  "applicableDeviceTypes": ["server", "workstation"],
+  "applicableSystems": ["linux"],
+  "linkedDevices": ["device456", "device789"],
+  "createdAt": "2025-04-27T10:00:00Z",
+  "updatedAt": "2025-04-27T10:00:00Z",
+  "CreatedBy": {
+    "userId": "user123"
   }
+}
