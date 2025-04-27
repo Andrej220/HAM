@@ -1,0 +1,1083 @@
+openapi: 3.0.3
+info:
+  title: Remote Script Execution API
+  description: API for HAM project - executing scripts on remote hosts, storing outputs in MongoDB and metadata in PostgreSQL, managing scripts, customers, and devices, and retrieving results.
+  version: 1.1.1
+servers:
+  - url: http://api.example.com/api/v1
+    description: Example server
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Pagination:
+      type: object
+      properties:
+        limit:
+          type: integer
+          default: 10
+          description: Number of items to return
+        offset:
+          type: integer
+          default: 0
+          description: Number of items to skip
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required:
+        - code
+        - message
+    DataCollection:
+      type: object
+      properties:
+        customerId:
+          type: string
+        deviceId:
+          type: string
+        configUUID:
+          type: string
+        scriptId:
+          type: string
+          description: ID of the script executed
+        output:
+          type: object
+          additionalProperties: true
+        executedAt:
+          type: string
+          format: date-time
+      required:
+        - customerId
+        - deviceId
+        - configUUID
+        - scriptId
+        - output
+        - executedAt
+    Archive:
+      allOf:
+        - $ref: "#/components/schemas/DataCollection"
+        - type: object
+          properties:
+            archivedAt:
+              type: string
+              format: date-time
+          required:
+            - archivedAt
+    DataCollectionResult:
+      type: object
+      properties:
+        customerId:
+          type: string
+        deviceId:
+          type: string
+        configUUID:
+          type: string
+        scriptId:
+          type: string
+          description: ID of the script executed
+        status:
+          type: string
+          enum: [pending, success, failed]
+        details:
+          type: string
+        executedAt:
+          type: string
+          format: date-time
+      required:
+        - customerId
+        - deviceId
+        - configUUID
+        - scriptId
+        - status
+        - executedAt
+    Customer:
+      type: object
+      properties:
+        customerId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+      required:
+        - customerId
+        - name
+    Device:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        customerId:
+          type: string
+        model:
+          type: string
+          description: Device type or model (e.g., router, server)
+        system:
+          type: string
+          description: Operating system or platform (e.g., linux, windows)
+        linkedScripts:
+          type: array
+          items:
+            type: string
+          description: List of script IDs assigned to the device
+      required:
+        - deviceId
+        - customerId
+        - model
+        - system
+    Script:
+      type: object
+      properties:
+        scriptId:
+          type: string
+        name:
+          type: string
+          description: Human-readable name of the script
+        version:
+          type: string
+          description: Script version
+        remote_host:
+          type: string
+          description: Host address and port (e.g., 77.83.86.216:22)
+        login:
+          type: string
+          description: Login username for the remote host
+        password:
+          type: string
+          description: Password for the remote host (optional, consider secure storage)
+        structure:
+          type: object
+          properties:
+            id:
+              type: string
+            type:
+              type: string
+              enum: [object, array, string]
+              description: Type of the node's output
+            script:
+              type: string
+              description: Command(s) to execute
+            post_process:
+              type: string
+              enum: [key_value, trim, none]
+              description: Post-processing method for the output
+            children:
+              type: array
+              items:
+                $ref: "#/components/schemas/ScriptNode"
+          required:
+            - id
+        applicableDeviceTypes:
+          type: array
+          items:
+            type: string
+          description: Device types the script can be applied to (e.g., router, server)
+        applicableSystems:
+          type: array
+          items:
+            type: string
+          description: Systems the script is compatible with (e.g., linux, windows)
+        linkedDevices:
+          type: array
+          items:
+            type: string
+          description: Device IDs the script is assigned to
+        createdBy:
+          type: string
+          description: User ID of the user who created the script
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - scriptId
+        - name
+        - version
+        - structure
+        - createdBy
+        - createdAt
+        - updatedAt
+    ScriptNode:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [object, array, string]
+        script:
+          type: string
+        post_process:
+          type: string
+          enum: [key_value, trim, none]
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScriptNode"
+      required:
+        - id
+paths:
+  /datacollection:
+    post:
+      summary: Execute scripts on a remote device
+      description: Queues execution of scripts linked to the specified device, or a specific script if provided, on the remote host. Outputs are stored in MongoDB.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerId:
+                  type: string
+                deviceId:
+                  type: string
+                scriptId:
+                  type: string
+                  description: Optional ID of a specific script to execute (overrides linked scripts)
+              required:
+                - customerId
+                - deviceId
+      responses:
+        "202":
+          description: Script execution queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configUUID:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - configUUID
+                  - message
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Device or script not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /dataservice/{customerId}/{deviceId}:
+    get:
+      summary: Get latest data collection output
+      description: Retrieves the most recent data collection output for the specified customer and device, optionally enriched with customer and device metadata.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Latest data collection output
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataCollection"
+        "404":
+          description: Output not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /dataservice/{customerId}/{deviceId}/history:
+    get:
+      summary: Get data collection history
+      description: Retrieves a paginated list of archived data collections for the specified customer and device.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Data collection history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Archive"
+        "404":
+          description: No history found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: Delete all history for a device
+      description: Deletes all archived data collections for the specified customer and device.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: History deleted successfully
+        "404":
+          description: No history found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /dataservice/{customerId}/{deviceId}/history/{configUUID}:
+    delete:
+      summary: Delete a specific archived data collection
+      description: Deletes a specific archived data collection identified by configUUID for the specified customer and device.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: configUUID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Archive deleted successfully
+        "404":
+          description: Archive not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /dataservice/uuid/{configUUID}:
+    get:
+      summary: Get data collection by UUID
+      description: Retrieves a data collection or archived data collection by its configUUID.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: configUUID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Data collection output
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/DataCollection"
+                  - $ref: "#/components/schemas/Archive"
+        "404":
+          description: Output not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /dataservice-results/{customerId}/{deviceId}:
+    get:
+      summary: Get data collection results
+      description: Retrieves a paginated list of data collection results for the specified customer and device.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Data collection results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DataCollectionResult"
+        "404":
+          description: No results found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /customers:
+    post:
+      summary: Create a new customer
+      description: Creates a new customer record in the metadata store.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Customer"
+      responses:
+        "201":
+          description: Customer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Customer ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /customers/{customerId}:
+    get:
+      summary: Get customer metadata
+      description: Retrieves metadata for the specified customer.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Customer metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "404":
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: Update customer metadata
+      description: Updates metadata for the specified customer.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Customer"
+      responses:
+        "200":
+          description: Customer updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: Delete a customer
+      description: Deletes the specified customer record.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Customer deleted successfully
+        "404":
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /devices:
+    post:
+      summary: Create a new device
+      description: Creates a new device record in the metadata store, optionally linking scripts to be executed on the device.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId:
+                  type: string
+                customerId:
+                  type: string
+                model:
+                  type: string
+                  description: Device type or model (e.g., router, server)
+                system:
+                  type: string
+                  description: Operating system or platform (e.g., linux, windows)
+                linkedScripts:
+                  type: array
+                  items:
+                    type: string
+                  description: List of script IDs to assign to the device
+              required:
+                - deviceId
+                - customerId
+                - model
+                - system
+      responses:
+        "201":
+          description: Device created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        "400":
+          description: Invalid request or incompatible script
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Device ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /devices/{deviceId}:
+    get:
+      summary: Get device metadata
+      description: Retrieves metadata for the specified device, including linked scripts.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Device metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        "404":
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: Update device metadata
+      description: Updates metadata for the specified device, including linked scripts.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Device"
+      responses:
+        "200":
+          description: Device updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        "400":
+          description: Invalid request or incompatible script
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: Delete a device
+      description: Deletes the specified device record.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Device deleted successfully
+        "404":
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /devices/{deviceId}/scripts:
+    post:
+      summary: Assign scripts to a device
+      description: Assigns one or more scripts to the specified device, validating compatibility with device type and system.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scriptIds:
+                  type: array
+                  items:
+                    type: string
+                  description: List of script IDs to assign
+              required:
+                - scriptIds
+      responses:
+        "200":
+          description: Scripts assigned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        "400":
+          description: Invalid request or incompatible script
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Device or script not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /devices/{deviceId}/scripts/{scriptId}:
+    delete:
+      summary: Unassign a script from a device
+      description: Removes a script assignment from the specified device.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: scriptId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Script unassigned successfully
+        "404":
+          description: Device or script not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /scripts:
+    post:
+      summary: Create a new script
+      description: Creates a new script record in MongoDB, including the user ID of the creator.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Script"
+      responses:
+        "201":
+          description: Script created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Script"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Script ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: List scripts
+      description: Retrieves a paginated list of scripts, optionally filtered by device type or system.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceType
+          in: query
+          schema:
+            type: string
+          description: Filter by applicable device type
+        - name: system
+          in: query
+          schema:
+            type: string
+          description: Filter by applicable system
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of scripts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Script"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /scripts/{scriptId}:
+    get:
+      summary: Get script details
+      description: Retrieves the specified script, including the user ID of the creator.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: scriptId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Script details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Script"
+        "404":
+          description: Script not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: Update a script
+      description: Updates the specified script, preserving the original createdBy user ID.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: scriptId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Script"
+      responses:
+        "200":
+          description: Script updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Script"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Script not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: Delete a script
+      description: Deletes the specified script.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: scriptId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Script deleted successfully
+        "404":
+          description: Script not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+security:
+  - bearerAuth: []
