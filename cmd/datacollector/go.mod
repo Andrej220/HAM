@@ -1,4 +1,4 @@
-module executor
+module datacollector
 
 go 1.23.6
 

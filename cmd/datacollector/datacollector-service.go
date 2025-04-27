@@ -1,9 +1,9 @@
 package main
 
 import (
-	"executor/pkg/workerpool"
+	"datacollector/pkg/workerpool"
 	//"executor/pkg/dataservice"
-	sshr "executor/pkg/sshrunner"
+	sshr "datacollector/pkg/sshrunner"
 	//"compress/gzip"
 	"encoding/json"
 	"fmt"

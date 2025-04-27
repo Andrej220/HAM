@@ -11,7 +11,7 @@ import (
 	"time"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
-    ds "executor/pkg/dataservice"
+    ds "datacollector/pkg/dataservice"
     "os"
 )
 
