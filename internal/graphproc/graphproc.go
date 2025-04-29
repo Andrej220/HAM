@@ -1,4 +1,4 @@
-package sshrunner
+package graphproc
 
 import (
 	"encoding/json"

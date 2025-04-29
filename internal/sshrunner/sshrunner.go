@@ -11,8 +11,9 @@ import (
 	"time"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
-    ds "datacollector/pkg/dataservice"
+    ds "github.com/andrej220/HAM/internal/dataservice"
     "os"
+    gp "github.com/andrej220/HAM/internal/graphproc"
 )
 
 const (
@@ -28,7 +29,7 @@ type SSHJob struct {
 }
 
 type task struct{
-    node    *Node
+    node    *gp.Node
     client  *ssh.Client
     session *ssh.Session
     ctx     context.Context
@@ -82,7 +83,7 @@ func newSSHSession(client *ssh.Client) (*ssh.Session, error) {
 
 func RunJob(jb SSHJob) error{
 
-    graph, err := NewGraphFromJSON("docconfig.json")
+    graph, err := gp.NewGraphFromJSON("docconfig.json")
 
     if err != nil {
         log.Printf("Error reading configuration %+v", err)
@@ -117,7 +118,7 @@ func RunJob(jb SSHJob) error{
 
         t := task{node:node,client: client, ctx:jb.Ctx, session: session}
 		wg.Add(1)
-		go func(n *Node) {
+		go func(n *gp.Node) {
 			defer wg.Done()
             defer t.session.Close()
             defer func(){ <-taskChan}() //release task slot

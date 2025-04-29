@@ -1,9 +1,9 @@
 package main
 
 import (
-	"datacollector/pkg/workerpool"
+	"github.com/andrej220/HAM/internal/workerpool"
 	//"executor/pkg/dataservice"
-	sshr "datacollector/pkg/sshrunner"
+	sshr "github.com/andrej220/HAM/internal/sshrunner"
 	//"compress/gzip"
 	"encoding/json"
 	"fmt"
