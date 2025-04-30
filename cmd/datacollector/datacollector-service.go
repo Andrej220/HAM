@@ -15,6 +15,7 @@ import (
 )
 
 const MAXTIMEOUT time.Duration = 1 * time.Minute
+const DATACOLLECTORPORT = "8081" 
 
 type datacollectorRequest struct {
 	HostID   int `json:"hostid"`
@@ -83,13 +84,12 @@ func main() {
 	handler := newDatacollectorHandler()
 	mux.Handle("/executor", serverutil.NewValidationHandler[datacollectorRequest](handler))
 
-	// Configure server using serverutil
 	config := serverutil.DefaultServerConfig()
+	config.Port = DATACOLLECTORPORT 
 	if err := serverutil.RunServer(mux, config); err != nil {
 		log.Fatalf("Failed to run server: %v", err)
 	}
 
-	// Stop the worker pool on shutdown
 	exh := handler.(*datacollectorHandler)
 	exh.pool.Stop()
 }
