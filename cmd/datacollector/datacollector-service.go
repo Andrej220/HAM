@@ -21,11 +21,11 @@ import (
 
 const MAXTIMEOUT time.Duration = 1*time.Minute
 
-type executorResponse struct{
+type datacollectorResponse struct{
 	ExecutionUID uuid.UUID `json:"exuid"`
 }
 
-type executorRequest struct{
+type datacollectorRequest struct{
 	HostID 		int `json:"hostid"`
 	ScriptID 	int  `json:"scriptid"`
 }
@@ -39,7 +39,7 @@ func newValidationHandler(next http.Handler) http.Handler {
 }
 
 func (h validationHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
-	var request executorRequest
+	var request datacollectorRequest
 	decoder := json.NewDecoder(r.Body)
 	
 	err := decoder.Decode(&request)
@@ -59,20 +59,20 @@ func (h validationHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 	h.next.ServeHTTP(rw, r.WithContext(ctx))
 }
 
-type executorHandler struct{
+type datacollectoHandler struct{
 	pool *workerpool.Pool[sshr.SSHJob]
 	cancelFuncs sync.Map
 }
 
-func newExecutorHandler() http.Handler {
-	h := executorHandler{}
+func newDatacollectorHandler() http.Handler {
+	h := datacollectoHandler{}
 	h.pool = workerpool.NewPool[sshr.SSHJob](workerpool.TotalMaxWorkers)
 	return &h
 }
 
-func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
+func (h *datacollectoHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 	
-	request, ok := r.Context().Value("request").(executorRequest)
+	request, ok := r.Context().Value("request").(datacollectorRequest)
 	if !ok {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
@@ -102,7 +102,7 @@ func (h *executorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 
 	h.cancelFuncs.Store(newUUID,cancel)
 	h.pool.Submit(jb)
-	response := executorResponse{ ExecutionUID: newUUID}
+	response := datacollectorResponse{ ExecutionUID: newUUID}
 
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
@@ -119,7 +119,7 @@ func main(){
 	}
 	
 	mux := http.NewServeMux()
-	handler:=newExecutorHandler()
+	handler:=newDatacollectorHandler()
 	mux.Handle("/executor", newValidationHandler(handler))
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
 	// Configure server
@@ -144,7 +144,7 @@ func main(){
 	<-done
 	log.Print("Server stopping...")
 
-	exh := handler.(*executorHandler)  //assert type
+	exh := handler.(*datacollectoHandler)  //assert type
 	exh.pool.Stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
