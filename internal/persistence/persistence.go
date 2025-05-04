@@ -66,18 +66,42 @@ func WriteJSONToFile(data any, filename string, serializer Serializer, writer Wr
     return nil
 }
 
-//   Example usage:
-//  data := map[string]string{"key": "value"}
-//  opts := persistence.Options{
-//      Overwrite: true,
-//      Prefix:    "",
-//      Indent:    "    ",
-//  }
-//  serializer := persistence.JSONSerializer{Prefix: opts.Prefix, Indent: opts.Indent}
-//  writer := persistence.FileWriter{Overwrite: opts.Overwrite}
-//  
-//  err := persistence.WriteJSONToFile(data, "output.json", serializer, writer, opts)
-//  if err != nil {
-//      log.Fatalf("Error: %v", err)
-//  }
-//  fmt.Println("Data written successfully")
+// WriteJSON persists data as JSON to a file with default settings (overwrite enabled, 4-space indent).
+func WriteJSON(data any, filename string) error {
+	serializer := JSONSerializer{Prefix: prefix, Indent: indent}
+	writer := FileWriter{Overwrite: true}
+	return WriteJSONToFile(data, filename, serializer, writer)
+}
+
+// Usage example
+//
+//    package persistence_test
+//    
+//    import (
+//    	"fmt"
+//    	"log"
+//    	".../persistence"
+//    )
+//    
+//    func ExampleWriteJSONToFile() {
+//    	data := map[string]string{"key": "value"}
+//    	serializer := persistence.JSONSerializer{Prefix: persistence.Prefix, Indent: persistence.Indent}
+//    	writer := persistence.FileWriter{Overwrite: true}
+//    
+//    	err := persistence.WriteJSONToFile(data, "output.json", serializer, writer)
+//    	if err != nil {
+//    		log.Fatalf("Error: %v", err)
+//    	}
+//    	fmt.Println("Data written successfully")
+//    	// Output: Data written successfully
+//    }
+//    
+//    func ExampleWriteJSON() {
+//    	data := map[string]string{"key": "value"}
+//    	err := persistence.WriteJSON(data, "output.json")
+//    	if err != nil {
+//    		log.Fatalf("Error: %v", err)
+//    	}
+//    	fmt.Println("Data written successfully")
+//    	// Output: Data written successfully
+//    }
