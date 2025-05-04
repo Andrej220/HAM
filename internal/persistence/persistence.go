@@ -10,15 +10,15 @@ import (
     "fmt"
 )
 
-type Options struct {
-    Overwrite bool
-    Prefix    string
-    Indent    string
-}
+const (
+    indent = "    "  // Default indentation for JSON output (4 spaces)
+    prefix = ""     // Default prefix for JSON output
+)
 
 type Serializer interface {
     Marshal(data any) ([]byte, error)
 }
+
 type Writer interface {
     Write(filename string, data []byte) error
 }
