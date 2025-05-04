@@ -4,6 +4,7 @@ package persistence_test
 
 import (
 	"fmt"
+	"path/filepath"
 	"log"
 	"testing"
 	"github.com/andrej220/HAM/internal/persistence"
@@ -48,7 +49,7 @@ func TestWriteJSONToFile(t *testing.T) {
 	}{
 		{
 			name:       "valid input",
-			filename:   "test.json",
+			filename:   filepath.Join(t.TempDir(), "output.json"),
 			data:       map[string]string{"key": "value"},
 			serializer: MockSerializer{Bytes: []byte(sampleJSON)},
 			writer:     &MockWriter{},
@@ -97,7 +98,9 @@ func TestWriteJSONToFile(t *testing.T) {
 
 func TestWriteJSON(t *testing.T) {
 	data := map[string]string{"key": "value"}
-	filename := "test.json"
+
+	dir := t.TempDir()
+	filename := filepath.Join(dir, "output.json")
 
 	writer := &MockWriter{}
 
@@ -110,8 +113,9 @@ func ExampleWriteJSONToFile() {
 	data := map[string]string{"key": "value"}
 	serializer := persistence.JSONSerializer{Prefix: prefix, Indent: indent}
 	writer := persistence.FileWriter{Overwrite: true}
-
-	err := persistence.WriteJSONToFile(data, "output.json", serializer, writer)
+	
+	filename := "output.json"
+	err := persistence.WriteJSONToFile(data, filename, serializer, writer)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
@@ -120,7 +124,10 @@ func ExampleWriteJSONToFile() {
 
 func ExampleWriteJSON() {
 	data := map[string]string{"key": "value"}
-	err := persistence.WriteJSON(data, "output.json")
+
+	filename := "output.json"
+	
+	err := persistence.WriteJSON(data, filename)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
