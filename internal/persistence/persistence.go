@@ -1,3 +1,6 @@
+// Package persistence provides functionality for persisting data to various destinations,
+// with support for different serialization formats.
+
 package persistence 
 
 import (
