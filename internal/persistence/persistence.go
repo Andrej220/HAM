@@ -49,18 +49,15 @@ func (w FileWriter) Write(filename string, data []byte) error {
 }
 
 // WriteJSONToFile persists data as JSON to a destination using the provided Serializer and Writer.
-// The opts parameter configures serialization and writing behavior, such as indentation and overwrite settings.
-func WriteJsonToFile(data any, filename string, serializer Serializer, writer Writer,  opts ...Options) error{
+func WriteJSONToFile(data any, filename string, serializer Serializer, writer Writer) error{
+	
+    if filename == "" {
+		return fmt.Errorf("invalid filename: %w", os.ErrInvalid)
+	}
 
-	opt := Options{Overwrite: true,Prefix:"",Indent:"    ",}
-
-    if len(opts) > 0 {
-        opt = opts[0]
-    }
-
-    bytes, err := json.MarshalIndent(data, opt.Prefix, opt.Indent)
+    bytes, err := serializer.Marshal(data)
     if err != nil {
-        return err
+        return fmt.Errorf("failed to marshal data: %w", err)
     }
 
     if err := writer.Write(filename, bytes); err != nil {
