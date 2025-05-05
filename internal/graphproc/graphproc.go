@@ -28,7 +28,7 @@ type Config struct {
 type alias struct {
 	ID          string   `json:"id"`
 	Type        string   `json:"type,omitempty"`
-	Children    []*Node  `json:"fields,omitempty"`
+	Children    []*Node  `json:"children,omitempty"`
 	Result      []string `json:"result,omitempty"`
 	Error		[]string `json:"error,omitempty"`
 }
