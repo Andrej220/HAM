@@ -17,6 +17,19 @@ type Node struct {
 	Stderr 		[]string `json:"error,omitempy"`
 }
 
+type HostConfig struct {
+	CustomerID int `json:"customerId"`			// Customer ID PostgreSQL
+	HostID      int    `json:"hostId"`			// Host ID PostgreSQL
+	ScriptID 	int    `json:"scriptId"`		// ID document in MongoDB
+	HostName 	string `json:"hostname"`
+	HostIP   	string `json:"hostip"`
+	HostPort 	int    `json:"hostport"`
+	HostUser 	string `json:"hostuser"`
+	HostPass 	string `json:"hostpass"`
+	HostKey  	string `json:"hostkey"`
+	HostType 	string `json:"hosttype"`
+}
+
 type Config struct {
 	Version    string    `json:"version"`
 	RemoteHost string    `json:"remote_host"`
