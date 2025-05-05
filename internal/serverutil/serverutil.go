@@ -21,7 +21,6 @@ type ServerConfig struct {
 	ShutdownTimeout time.Duration
 }
 
-// DefaultServerConfig provides default server configuration values.
 func DefaultServerConfig() ServerConfig {
 	return ServerConfig{
 		Port:            "8081",
@@ -32,9 +31,8 @@ func DefaultServerConfig() ServerConfig {
 	}
 }
 
-// RunServer starts an HTTP server with the provided handler and configuration.
-// It handles graceful shutdown on interrupt signals (SIGINT, SIGTERM).
 func RunServer(handler http.Handler, config ServerConfig) error {
+	// TODO: PASS LISTENING PORT
 	if config.Port == "" {
 		config.Port = os.Getenv("EXECUTORPORT")
 		if config.Port == "" {
@@ -66,7 +64,6 @@ func RunServer(handler http.Handler, config ServerConfig) error {
 	<-done
 	log.Print("Server stopping...")
 
-	// Create a context for graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), config.ShutdownTimeout)
 	defer cancel()
 
@@ -79,7 +76,6 @@ func RunServer(handler http.Handler, config ServerConfig) error {
 	return nil
 }
 
-// ValidationHandler is a middleware that validates incoming JSON requests.
 type ValidationHandler[T any] struct {
 	next http.Handler
 	validator func(*T) error
@@ -111,7 +107,7 @@ func (h *ValidationHandler[T]) ServeHTTP(rw http.ResponseWriter, r *http.Request
 		http.Error(rw, fmt.Sprintf("Invalid request: %v", err), http.StatusBadRequest)
 		return
 	}
-
+	
 	if err := h.validator(&request); err != nil {
 		respondWithValidationError(rw, err)
 		return
