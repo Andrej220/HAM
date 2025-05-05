@@ -36,6 +36,8 @@ type Config struct {
 	RemoteHost string    `json:"remote_host"`
 	Password   string    `json:"password"`
 	Login      string    `json:"login"`
+	CustomerID string    `json:"customer_id"`
+	HostID     string    `json:"host_id"`
 	Structure  *Node     `json:"structure"`
 }
 
