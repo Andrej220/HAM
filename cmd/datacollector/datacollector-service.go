@@ -26,13 +26,17 @@ type datacollectorResponse struct {
 }
 
 type datacollectorHandler struct {
-	pool        *workerpool.Pool[sshrunner.SSHJob]
-	cancelFuncs sync.Map
+	pool        *workerpool.Pool[SSHJob]
+	cancelFuncs  sync.Map
+	httpClient  *http.Client
 }
 
 func newDatacollectorHandler() http.Handler {
 	h := &datacollectorHandler{
-		pool: workerpool.NewPool[sshrunner.SSHJob](workerpool.TotalMaxWorkers),
+		pool: workerpool.NewPool[SSHJob](workerpool.TotalMaxWorkers),
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+		},
 	}
 	return h
 }
