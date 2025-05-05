@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	//"fmt"
 	"github.com/andrej220/HAM/internal/serverutil"
-	"github.com/andrej220/HAM/internal/sshrunner"
 	"github.com/andrej220/HAM/internal/workerpool"
 	"github.com/google/uuid"
 	"log"
@@ -48,14 +47,14 @@ func (h *datacollectorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithTimeout(context.Background(), MAXTIMEOUT)
 	newUUID := uuid.New()
 
-	sshJob := sshrunner.SSHJob{
+	sshJob := SSHJob{
 		HostID:   request.HostID,
 		ScriptID: request.ScriptID,
 		UUID:     newUUID,
 		Ctx:      ctx,
 	}
 
-	jb := workerpool.Job[sshrunner.SSHJob]{
+	jb := workerpool.Job[SSHJob]{
 		Payload: sshJob,
 		Fn:      sshrunner.RunJob,
 		Ctx:     ctx,
