@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"github.com/google/uuid"
 )
 
 type Node struct {
@@ -47,8 +48,21 @@ type alias struct {
 }
 
 type Graph struct {
-	Config *Config
-	Root   *Node
+	Config 	*Config		`json:"config,omitempty"`
+	HostCfg *HostConfig	`json:"hostconfig,omitempty"`
+	UUID     uuid.UUID	`json:"uuid,omitempty"`
+	Root    *Node		`json:"rootnode,omitempty"`
+}
+
+func (g *Graph) MarshalJSON() ([]byte, error) {
+    type Alias Graph
+    return json.Marshal(&struct {
+        *Alias
+        UUID string `json:"uuid"` 
+    }{
+        Alias: (*Alias)(g),
+        UUID:  g.UUID.String(),
+    })
 }
 
 func (n *Node) MarshalJSON() ([]byte, error) {
