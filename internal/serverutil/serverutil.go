@@ -82,14 +82,24 @@ func RunServer(handler http.Handler, config ServerConfig) error {
 // ValidationHandler is a middleware that validates incoming JSON requests.
 type ValidationHandler[T any] struct {
 	next http.Handler
+	validator func(*T) error
 }
 
-// NewValidationHandler creates a new validation handler for the given request type.
-func NewValidationHandler[T any](next http.Handler) http.Handler {
-	return &ValidationHandler[T]{next: next}
+func NewValidationHandler[T any](next http.Handler, validator ...func(*T) error) http.Handler {
+	// TODO: implement a default validator
+	var validateFunc func(*T) error
+	if len(validator) > 0 {
+		validateFunc = validator[0]
+	} else {
+		validateFunc = defaultValidator[T]
+	}
+
+	return &ValidationHandler[T]{
+		next:      next,
+		validator: validateFunc,
+	}
 }
 
-// ServeHTTP decodes and validates the JSON request, passing it to the next handler via context.
 func (h *ValidationHandler[T]) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	var request T
 	decoder := json.NewDecoder(r.Body)
@@ -102,20 +112,30 @@ func (h *ValidationHandler[T]) ServeHTTP(rw http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Validate request (implement validation logic in a separate method if needed)
-	if err := validateRequest(request); err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
+	if err := h.validator(&request); err != nil {
+		respondWithValidationError(rw, err)
 		return
 	}
-
 	// Pass the decoded request to the next handler via context
 	ctx := context.WithValue(r.Context(), "request", request)
 	h.next.ServeHTTP(rw, r.WithContext(ctx))
 }
 
-// validateRequest is a placeholder for request-specific validation logic.
-// Replace with actual validation logic for type T or pass a validator function.
-func validateRequest[T any](req T) error {
-	// Example: Add specific validation logic here or make it configurable
+// respondWithValidationError sends standardized validation error responses
+func respondWithValidationError(rw http.ResponseWriter, err error) {
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusBadRequest)
+	
+	// TODO: customize error response
+	json.NewEncoder(rw).Encode(map[string]interface{}{
+		"error":   "Validation failed",
+		"details": err.Error(),
+	})
+}
+
+
+// basic validation 
+func defaultValidator[T any](req *T) error {
+	// Basic validation 
 	return nil
 }
