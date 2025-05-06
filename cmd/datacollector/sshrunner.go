@@ -224,7 +224,6 @@ func processNode(ctx context.Context, client *ResilientSSHClient, node *gp.Node)
     return backoff.Retry(operation, b)
 }
 
-// TODO: Add errors propagation 
 func runTask(t *task) error {
 	if t.node.Type == "object" || len(t.node.Script) == 0 {
 		return nil
@@ -276,6 +275,7 @@ func runTask(t *task) error {
 	default:
 		if err := t.session.Wait(); err != nil {
 			log.Printf("Script error: %v", err)
+			return fmt.Errorf("script execution failed: %w", err)
 		}
 	}
 	return nil
