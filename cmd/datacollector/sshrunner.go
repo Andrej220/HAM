@@ -10,13 +10,14 @@ import (
 	"log"
 	"os"
 	"strings"
-	"sync"
+	//"sync"
 	"time"
 
-	//ps "github.com/andrej220/HAM/internal/persistence"
+	"golang.org/x/sync/errgroup"
 	gp "github.com/andrej220/HAM/internal/graphproc"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
+	"github.com/cenkalti/backoff/v4"
 )
 
 const (
@@ -104,61 +105,77 @@ func loadGraphConfig(jb SSHJob)(*gp.Graph, error){
 }
 
 func RunJob(jb SSHJob) (*gp.Graph, error) {
+
 	log.Printf("Starting job for host %d, script %d, UUID %s", jb.HostID, jb.ScriptID, jb.UUID)
-	
-    graph, err := loadGraphConfig(jb)                         
-    if err != nil {
-        return nil, fmt.Errorf("configuration error: %w", err)
-    }
-	
+
+	graph, err := loadGraphConfig(jb)
+	if err != nil {
+		return nil, fmt.Errorf("config: %w", err)
+	}
 	client, err := newSSHClient(graph.Config.RemoteHost, graph.Config.Login, graph.Config.Password)
 	if err != nil {
-		log.Printf("Error connection remote host: %+v", err)
-		return nil, err
+		return nil, fmt.Errorf("ssh dial: %w", err)
 	}
 	defer client.Close()
 
-	nodeChan := graph.NodeGenerator()
-	var wg sync.WaitGroup
+	g, ctx := errgroup.WithContext(jb.Ctx)
+	nodes := graph.NodeGenerator()
+	// TODO: uncommect if partial data is needed
+	//var mu sync.Mutex  
+	//var errors []error
 
-	taskChan := make(chan struct{}, maxConcurrent) // Semaphore, limits concurent workers
-	var mu sync.Mutex
-	var errors []error
-
-	for node := range nodeChan {
-		taskChan <- struct{}{} //take a slot for the task
-		session, err := newSSHSession(client)
-		if err != nil {
-			log.Printf("Failed to create session for node %v: %v", node, err)
-			<-taskChan //release slot dues to failure
-			mu.Lock()
-			errors = append(errors, err)
-			mu.Unlock()
-			continue
-		}
-
-		t := task{node: node, client: client, ctx: jb.Ctx, session: session}
-		wg.Add(1)
-		go func(n *gp.Node) {
-			defer wg.Done()
-			defer t.session.Close()
-			defer func() { <-taskChan }() //release task slot
-
-			err = runTask(&t)
-			if err != nil {
-				mu.Lock()
-				errors = append(errors, err)
-				mu.Unlock()
-				log.Printf("Task execution failed: %+v", err)
+	for i := 0; i < maxConcurrent; i++ {
+		g.Go(func() error {
+			for node := range nodes {
+				if err := processNode(ctx, client, node); err != nil {
+						//mu.Lock()
+						//errors = append(errors, err)   //collect errors
+						//mu.Unlock()
+						//continue
+					return err
+				}
 			}
-		}(node)
+			return nil
+		})
 	}
-	wg.Wait()
-
-	if len(errors) > 0 {
-		return nil, fmt.Errorf("one or more tasks failed, first error: %v", errors[0])
+			//g.Wait() // Wait for all workers, ignoring context cancellation
+			//if len(errors) > 0 {
+			//	return graph, fmt.Errorf("some tasks failed: %v errors", len(errors))
+			//}
+	if err := g.Wait(); err != nil {
+		return graph, fmt.Errorf("job failed: %w", err)
 	}
 	return graph, nil
+}
+
+func processNode(ctx context.Context, client *ssh.Client, node *gp.Node) error {
+    if node.Type == "object" || len(node.Script) == 0 {
+        return nil
+    }
+
+    operation := func() error {
+        select {
+        case <-ctx.Done():
+            return backoff.Permanent(ctx.Err()) // Mark as permanent to stop retries
+        default:
+        }
+
+        sess, err := newSSHSession(client)
+        if err != nil {
+            return fmt.Errorf("new session: %w", err) 
+        }
+        defer sess.Close()
+
+        t := &task{node: node, client: client, session: sess, ctx: ctx}
+        if err := runTask(t); err != nil {
+            log.Printf("node %v attempt failed: %v", node, err) 
+            return err
+        }
+        return nil
+    }
+
+    b := backoff.WithContext(backoff.NewExponentialBackOff(), ctx)
+    return backoff.Retry(operation, b)
 }
 
 // TODO: Add error propagation
