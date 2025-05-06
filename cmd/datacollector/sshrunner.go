@@ -100,29 +100,6 @@ func publicKeyAuth(privateKeyPath string) ssh.AuthMethod {
 	return ssh.PublicKeys(signer)
 }
 
-//func newSSHClient(remote string, login string, password string) (*ssh.Client, error) {
-//	log.Println("Connecting to SSH server")
-//
-//	// TODO: just for the test
-//	// change it for production
-//	config := &ssh.ClientConfig{
-//		User: login,
-//		//Auth: []ssh.AuthMethod{ssh.Password(password)},
-//		Auth:            []ssh.AuthMethod{publicKeyAuth("/home/andrey/.ssh/myadminvps.ru")}, // TODO: move to main
-//		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-//		Timeout:         10 * time.Second,
-//		BannerCallback:  func(message string) error { return nil }, //ignore banner
-//	}
-//
-//	client, err := ssh.Dial("tcp", remote, config)
-//	if err != nil {
-//		return nil, fmt.Errorf("failed to dial  %w", err)
-//	}
-//
-//	log.Printf("SSH connection established to %s. ", remote)
-//	return client, nil
-//}
-
 func newSSHSession(client *ssh.Client,cb *gobreaker.CircuitBreaker) (*ssh.Session, error) {
 	res, err := cb.Execute(func() (any, error) {
         return client.NewSession()
