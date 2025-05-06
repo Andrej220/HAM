@@ -84,10 +84,9 @@ func newSSHSession(client *ssh.Client) (*ssh.Session, error) {
 	return session, nil
 }
 
-func RunJob(jb SSHJob) (*gp.Graph, error) {
-	log.Printf("Starting job for host %d, script %d, UUID %s", jb.HostID, jb.ScriptID, jb.UUID)
-	
-	//TODO: read task from the database
+func loadGraphConfig(jb SSHJob)(*gp.Graph, error){
+
+	//TODO: load task from the database
 	graph, err := gp.NewGraphFromJSON("docconfig.json")
 	if err != nil {
 		log.Printf("Error reading configuration %+v", err)
@@ -101,8 +100,17 @@ func RunJob(jb SSHJob) (*gp.Graph, error) {
 		HostID:     	jb.HostID,
 		ScriptID: 		jb.ScriptID,
 	}
-	//                              
+	return graph, nil
+}
 
+func RunJob(jb SSHJob) (*gp.Graph, error) {
+	log.Printf("Starting job for host %d, script %d, UUID %s", jb.HostID, jb.ScriptID, jb.UUID)
+	
+    graph, err := loadGraphConfig(jb)                         
+    if err != nil {
+        return nil, fmt.Errorf("configuration error: %w", err)
+    }
+	
 	client, err := newSSHClient(graph.Config.RemoteHost, graph.Config.Login, graph.Config.Password)
 	if err != nil {
 		log.Printf("Error connection remote host: %+v", err)
@@ -150,16 +158,6 @@ func RunJob(jb SSHJob) (*gp.Graph, error) {
 	if len(errors) > 0 {
 		return nil, fmt.Errorf("one or more tasks failed, first error: %v", errors[0])
 	}
-	// TODO: save data to the database
-	//test only
-	//ds.WriteFile(graph.Root, "/tmp/test.json")
-	//err = ds.SaveData(graph.Root)
-	//if err != nil {
-	//	log.Printf("Error saving data: %+v", err)
-	//	return err
-	//}
-	//log.Printf("Data saved to MongoDB")
-	//log.Printf("All tasks completed successfully")
 	return graph, nil
 }
 
