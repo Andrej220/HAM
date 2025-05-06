@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
 	"github.com/cenkalti/backoff/v4"
+	"github.com/sony/gobreaker"
 )
 
 const (
@@ -39,25 +40,13 @@ type task struct {
 	ctx     context.Context
 }
 
-func publicKeyAuth(privateKeyPath string) ssh.AuthMethod {
-	key, err := os.ReadFile(privateKeyPath)
-	if err != nil {
-		log.Fatalf("unable to read private key: %v", err)
-	}
-
-	signer, err := ssh.ParsePrivateKey(key)
-	if err != nil {
-		log.Fatalf("unable to parse private key: %v", err)
-	}
-
-	return ssh.PublicKeys(signer)
+type ResilientSSHClient struct {
+    sshclient  *ssh.Client
+    cb         *gobreaker.CircuitBreaker
+    backoff    backoff.BackOff
 }
 
-func newSSHClient(remote string, login string, password string) (*ssh.Client, error) {
-	log.Println("Connecting to SSH server")
-
-	// TODO: just for the test
-	// change it for production
+func NewResilientClient(ctx context.Context,remote, login, password string) (*ResilientSSHClient, error) {
 	config := &ssh.ClientConfig{
 		User: login,
 		//Auth: []ssh.AuthMethod{ssh.Password(password)},
@@ -72,17 +61,76 @@ func newSSHClient(remote string, login string, password string) (*ssh.Client, er
 		return nil, fmt.Errorf("failed to dial  %w", err)
 	}
 
-	log.Printf("SSH connection established to %s. ", remote)
+    defaultBackoff := &backoff.ExponentialBackOff{
+		InitialInterval:     500 * time.Millisecond,
+		MaxInterval:         5 * time.Second,
+		Multiplier:          1.5,
+		RandomizationFactor: 0.5,
+		Stop:                backoff.Stop,
+		Clock:               backoff.SystemClock,
+	}
 
-	return client, nil
+	cbs := gobreaker.Settings{
+		Name:        "ssh-connection",
+		MaxRequests: 5,         
+		Interval:    1 * time.Minute,
+		Timeout:     30 * time.Second,
+		ReadyToTrip: func(counts gobreaker.Counts) bool {
+			return counts.ConsecutiveFailures > 5
+		},
+	}
+
+    return &ResilientSSHClient{
+        sshclient: client,
+        cb: gobreaker.NewCircuitBreaker(cbs),
+        backoff: backoff.WithContext(defaultBackoff, ctx),
+    }, nil
 }
 
-func newSSHSession(client *ssh.Client) (*ssh.Session, error) {
-	session, err := client.NewSession()
+func publicKeyAuth(privateKeyPath string) ssh.AuthMethod {
+	key, err := os.ReadFile(privateKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("session creation failed: %w", err)
+		log.Fatalf("unable to read private key: %v", err)
 	}
-	return session, nil
+
+	signer, err := ssh.ParsePrivateKey(key)
+	if err != nil {
+		log.Fatalf("unable to parse private key: %v", err)
+	}
+	return ssh.PublicKeys(signer)
+}
+
+//func newSSHClient(remote string, login string, password string) (*ssh.Client, error) {
+//	log.Println("Connecting to SSH server")
+//
+//	// TODO: just for the test
+//	// change it for production
+//	config := &ssh.ClientConfig{
+//		User: login,
+//		//Auth: []ssh.AuthMethod{ssh.Password(password)},
+//		Auth:            []ssh.AuthMethod{publicKeyAuth("/home/andrey/.ssh/myadminvps.ru")}, // TODO: move to main
+//		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+//		Timeout:         10 * time.Second,
+//		BannerCallback:  func(message string) error { return nil }, //ignore banner
+//	}
+//
+//	client, err := ssh.Dial("tcp", remote, config)
+//	if err != nil {
+//		return nil, fmt.Errorf("failed to dial  %w", err)
+//	}
+//
+//	log.Printf("SSH connection established to %s. ", remote)
+//	return client, nil
+//}
+
+func newSSHSession(client *ssh.Client,cb *gobreaker.CircuitBreaker) (*ssh.Session, error) {
+	res, err := cb.Execute(func() (any, error) {
+        return client.NewSession()
+    })
+    if err != nil {
+        return nil, err
+    }
+    return res.(*ssh.Session), nil
 }
 
 func loadGraphConfig(jb SSHJob)(*gp.Graph, error){
@@ -105,18 +153,17 @@ func loadGraphConfig(jb SSHJob)(*gp.Graph, error){
 }
 
 func RunJob(jb SSHJob) (*gp.Graph, error) {
-
 	log.Printf("Starting job for host %d, script %d, UUID %s", jb.HostID, jb.ScriptID, jb.UUID)
 
 	graph, err := loadGraphConfig(jb)
 	if err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
-	client, err := newSSHClient(graph.Config.RemoteHost, graph.Config.Login, graph.Config.Password)
+	rClient, err := NewResilientClient(jb.Ctx,graph.Config.RemoteHost, graph.Config.Login, graph.Config.Password)
 	if err != nil {
 		return nil, fmt.Errorf("ssh dial: %w", err)
 	}
-	defer client.Close()
+	defer rClient.sshclient.Close()
 
 	g, ctx := errgroup.WithContext(jb.Ctx)
 	nodes := graph.NodeGenerator()
@@ -127,7 +174,7 @@ func RunJob(jb SSHJob) (*gp.Graph, error) {
 	for i := 0; i < maxConcurrent; i++ {
 		g.Go(func() error {
 			for node := range nodes {
-				if err := processNode(ctx, client, node); err != nil {
+				if err := processNode(ctx, rClient, node); err != nil {
 						//mu.Lock()
 						//errors = append(errors, err)   //collect errors
 						//mu.Unlock()
@@ -148,11 +195,10 @@ func RunJob(jb SSHJob) (*gp.Graph, error) {
 	return graph, nil
 }
 
-func processNode(ctx context.Context, client *ssh.Client, node *gp.Node) error {
+func processNode(ctx context.Context, client *ResilientSSHClient, node *gp.Node) error {
     if node.Type == "object" || len(node.Script) == 0 {
         return nil
     }
-
     operation := func() error {
         select {
         case <-ctx.Done():
@@ -160,13 +206,13 @@ func processNode(ctx context.Context, client *ssh.Client, node *gp.Node) error {
         default:
         }
 
-        sess, err := newSSHSession(client)
+        sess, err := newSSHSession(client.sshclient, client.cb)
         if err != nil {
             return fmt.Errorf("new session: %w", err) 
         }
         defer sess.Close()
 
-        t := &task{node: node, client: client, session: sess, ctx: ctx}
+        t := &task{node: node, client: client.sshclient, session: sess, ctx: ctx}
         if err := runTask(t); err != nil {
             log.Printf("node %v attempt failed: %v", node, err) 
             return err
@@ -178,10 +224,8 @@ func processNode(ctx context.Context, client *ssh.Client, node *gp.Node) error {
     return backoff.Retry(operation, b)
 }
 
-// TODO: Add error propagation
+// TODO: Add errors propagation 
 func runTask(t *task) error {
-
-	// skip if object (no script to execute)
 	if t.node.Type == "object" || len(t.node.Script) == 0 {
 		return nil
 	}
@@ -220,7 +264,6 @@ func runTask(t *task) error {
 
 	log.Println("Start reading stdout.")
 
-	// run them as goroutines
 	var res []string
 	res = readOutput(stdout, t.ctx)
 	t.node.Stderr = readOutput(stderr, t.ctx)
@@ -286,7 +329,6 @@ func processOutput(lines []string, postProcess string, nodeType string) []string
 					kv[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 				}
 			}
-			// Convert to []string for consistency, e.g., ["processor: 0", "vendor_id: GenuineIntel"]
 			result := make([]string, 0, len(kv))
 			for k, v := range kv {
 				result = append(result, fmt.Sprintf("%s: %s", k, v))

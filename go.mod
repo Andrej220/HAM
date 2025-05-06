@@ -8,6 +8,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/google/uuid v1.6.0
+	github.com/sony/gobreaker v1.0.0
 	github.com/stretchr/testify v1.8.4
 	go.mongodb.org/mongo-driver v1.17.3
 	golang.org/x/crypto v0.37.0
