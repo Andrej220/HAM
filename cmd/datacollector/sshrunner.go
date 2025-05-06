@@ -173,8 +173,14 @@ func RunJob(jb SSHJob) (*gp.Graph, error) {
 
 	for i := 0; i < maxConcurrent; i++ {
 		g.Go(func() error {
+			sess, err := newSSHSession(rClient.sshclient, rClient.cb)
+			if err != nil {
+				return fmt.Errorf("new session: %w", err) 
+			}
+			defer sess.Close()
+
 			for node := range nodes {
-				if err := processNode(ctx, rClient, node); err != nil {
+				if err := processNode(ctx, rClient, sess, node); err != nil {
 						//mu.Lock()
 						//errors = append(errors, err)   //collect errors
 						//mu.Unlock()
@@ -195,7 +201,7 @@ func RunJob(jb SSHJob) (*gp.Graph, error) {
 	return graph, nil
 }
 
-func processNode(ctx context.Context, client *ResilientSSHClient, node *gp.Node) error {
+func processNode(ctx context.Context, rclient * ResilientSSHClient ,session *ssh.Session, node *gp.Node) error {
     if node.Type == "object" || len(node.Script) == 0 {
         return nil
     }
@@ -206,13 +212,7 @@ func processNode(ctx context.Context, client *ResilientSSHClient, node *gp.Node)
         default:
         }
 
-        sess, err := newSSHSession(client.sshclient, client.cb)
-        if err != nil {
-            return fmt.Errorf("new session: %w", err) 
-        }
-        defer sess.Close()
-
-        t := &task{node: node, client: client.sshclient, session: sess, ctx: ctx}
+        t := &task{node: node,client: rclient.sshclient ,session: session, ctx: ctx}
         if err := runTask(t); err != nil {
             log.Printf("node %v attempt failed: %v", node, err) 
             return err
@@ -260,7 +260,6 @@ func runTask(t *task) error {
 		log.Printf("Failed to start script: %v", err)
 		return err
 	}
-
 	log.Println("Start reading stdout.")
 
 	var res []string
