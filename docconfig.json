@@ -14,14 +14,14 @@
         "children": [
           {
             "id": "cpu",
-            "type": "string",
-            "script": "lscpu ; sleep 5;",
+            "type": "array",
+            "script": "lscpu",
             "post_process": "key_value"
           },
           {
             "id": "memory",
-            "type": "array",
-            "script": "free -h ; sleep 5",
+            "type": "string",
+            "script": "free -h",
             "post_process": "trim"
           }
         ]
@@ -33,7 +33,7 @@
           {
             "id": "disks",
             "type": "array",
-            "script": "df -h ; sleep 2",
+            "script": "df -h",
             "post_process": "trim"
           }
         ]
@@ -41,7 +41,7 @@
       {
         "id": "uptime",
         "type": "string",
-        "script": "uptime -p; sleep 2",
+        "script": "uptime -p",
         "post_process": "trim"
       }
     ]
