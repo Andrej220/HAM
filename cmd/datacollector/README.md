@@ -1,4 +1,8 @@
-##Class Diagram
+## Architecture Overview
+
+
+### Class Diagram
+The core components and their relationships:
 
 ``` mermaid
 classDiagram
@@ -62,7 +66,7 @@ classDiagram
 ```
 
 
-##Flowchart
+## Flowchart
 
 ``` mermaid
 flowchart TD
