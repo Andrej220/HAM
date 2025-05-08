@@ -9,10 +9,9 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
-	"strings"
 	"golang.org/x/sync/errgroup"
 	gp "github.com/andrej220/HAM/internal/graphproc"
+	pc "github.com/andrej220/HAM/internal/processor"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
 	"github.com/cenkalti/backoff/v4"
@@ -22,6 +21,10 @@ const (
 	MAXLINES      = 50
 	maxConcurrent = 7
 )
+
+type Executor interface{
+	Run(script string, ctx context.Context) ( stdout *io.Reader, stderr *io.Reader, err error)
+}
 
 type SSHJob struct {
 	HostID   int
@@ -34,20 +37,47 @@ type task struct {
 	node    *gp.Node
 	client  *ssh.Client
 	session *ssh.Session
-	ctx     context.Context
 }
 
-func publicKeyAuth(privateKeyPath string) ssh.AuthMethod {
-	key, err := os.ReadFile(privateKeyPath)
-	if err != nil {
-		log.Fatalf("unable to read private key: %v", err)
+func (t * task)Run(script string, ctx context.Context)(stdout io.Reader, stderr io.Reader, err error){
+	if t.session == nil {
+		return nil, nil, fmt.Errorf("Error, session has not been created: %s", t.client.RemoteAddr())
 	}
 
-	signer, err := ssh.ParsePrivateKey(key)
-	if err != nil {
-		log.Fatalf("unable to parse private key: %v", err)
+	select {
+	case <-ctx.Done():
+		log.Printf("Task canceled before start: %v", ctx.Err())
+		return nil, nil, ctx.Err()
+	default:
 	}
-	return ssh.PublicKeys(signer)
+
+	log.Printf("Session is created for %s", t.client.RemoteAddr())
+
+	stdout, err = t.session.StdoutPipe()
+	if err != nil {
+		log.Printf("Failed to get stdout pipe: %+v", err)
+		return nil, nil, err
+	}
+
+	stderr, err = t.session.StderrPipe()
+	if err != nil {
+		log.Printf("Failed to get stderr pipe: %+v", err)
+		return nil, nil, err
+	}
+	
+	log.Println("Executing script.")
+	err = t.session.Start(t.node.Script)
+	if err != nil {
+		log.Printf("Failed to start script: %v", err)
+		return nil, nil, err
+	}
+	// Wait for script completion to ensure output is ready
+	go func() {
+		if err := t.session.Wait(); err != nil {
+			log.Printf("Script execution failed: %v", err)
+		}
+	}()
+	return stdout, stderr, nil
 }
 
 func loadGraphConfig(jb SSHJob)(*gp.Graph, error){
@@ -76,11 +106,11 @@ func RunJob(jb SSHJob) (*gp.Graph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
-	rClient, err := NewResilientClient(jb.Ctx,graph.Config.RemoteHost, graph.Config.Login, graph.Config.Password)
+	rClient, err := NewResilientClient(graph.Config.RemoteHost, graph.Config.Login, graph.Config.Password)
 	if err != nil {
 		return nil, fmt.Errorf("ssh dial: %w", err)
 	}
-	defer rClient.sshclient.Close()
+	defer rClient.SSHClient.Close()
 
 	g, ctx := errgroup.WithContext(jb.Ctx)
 	nodes := graph.NodeGenerator()
@@ -90,7 +120,7 @@ func RunJob(jb SSHJob) (*gp.Graph, error) {
 
 	for i := 0; i < maxConcurrent; i++ {
 		g.Go(func() error {
-			sess, err := newSSHSession(rClient.sshclient, rClient.cb)
+			sess, err := newSSHSession(rClient.SSHClient, rClient.ResConf.CircuitBreaker)
 			if err != nil {
 				return fmt.Errorf("new session: %w", err) 
 			}
@@ -98,7 +128,6 @@ func RunJob(jb SSHJob) (*gp.Graph, error) {
 
 			for node := range nodes {
 				if err := processNode(ctx, rClient, sess, node); err != nil {
-						//mu.Lock()
 						//errors = append(errors, err)   //collect errors
 						//mu.Unlock()
 						//continue
@@ -122,6 +151,8 @@ func processNode(ctx context.Context, rclient * ResilientSSHClient ,session *ssh
     if node.Type == "object" || len(node.Script) == 0 {
         return nil
     }
+	pChain := pc.NewProcessorChain()
+	
     operation := func() error {
         select {
         case <-ctx.Done():
@@ -129,72 +160,21 @@ func processNode(ctx context.Context, rclient * ResilientSSHClient ,session *ssh
         default:
         }
 
-        t := &task{node: node,client: rclient.sshclient ,session: session, ctx: ctx}
-        if err := runTask(t); err != nil {
+        t := &task{node: node,client: rclient.SSHClient ,session: session}
+		stdout, stderr, err := t.Run(node.Script,ctx)
+        if err != nil {
             log.Printf("node %v attempt failed: %v", node, err) 
             return err
         }
+		log.Println("Start reading stdout.")
+		var res []string
+		res = readOutput(stdout, ctx)
+		node.Stderr = readOutput(stderr, ctx)
+		node.Result, _ = pChain.Process(res,pc.NodeType(node.Type),node.PostProcess)
         return nil
     }
-
     b := backoff.WithContext(backoff.NewExponentialBackOff(), ctx)
     return backoff.Retry(operation, b)
-}
-
-func runTask(t *task) error {
-	if t.node.Type == "object" || len(t.node.Script) == 0 {
-		return nil
-	}
-
-	if t.session == nil {
-		return fmt.Errorf("Error, session has not been created: %s", t.client.RemoteAddr())
-	}
-
-	select {
-	case <-t.ctx.Done():
-		log.Printf("Task canceled before start: %v", t.ctx.Err())
-		return t.ctx.Err()
-	default:
-	}
-
-	log.Printf("Session is created for %s", t.client.RemoteAddr())
-
-	stdout, err := t.session.StdoutPipe()
-	if err != nil {
-		log.Printf("Failed to get stdout pipe: %+v", err)
-		return err
-	}
-
-	stderr, err := t.session.StderrPipe()
-	if err != nil {
-		log.Printf("Failed to get stderr pipe: %+v", err)
-		return err
-	}
-
-	log.Println("Executing script.")
-	err = t.session.Start(t.node.Script)
-	if err != nil {
-		log.Printf("Failed to start script: %v", err)
-		return err
-	}
-	log.Println("Start reading stdout.")
-
-	var res []string
-	res = readOutput(stdout, t.ctx)
-	t.node.Stderr = readOutput(stderr, t.ctx)
-	t.node.Result = processOutput(res, t.node.PostProcess, t.node.Type)
-
-	select {
-	case <-t.ctx.Done():
-		log.Printf("Task canceled before wait: %v", t.ctx.Err())
-		return t.ctx.Err()
-	default:
-		if err := t.session.Wait(); err != nil {
-			log.Printf("Script error: %v", err)
-			return fmt.Errorf("script execution failed: %w", err)
-		}
-	}
-	return nil
 }
 
 func readOutput(reader io.Reader, ctx context.Context) []string {
@@ -213,46 +193,4 @@ func readOutput(reader io.Reader, ctx context.Context) []string {
 		log.Printf("Scan error: %v", err)
 	}
 	return lines
-}
-
-func processOutput(lines []string, postProcess string, nodeType string) []string {
-	if len(lines) == 0 {
-		return nil
-	}
-	switch postProcess {
-	case "trim":
-		trimmed := make([]string, 0, len(lines))
-		for _, line := range lines {
-			trimmed = append(trimmed, strings.TrimSpace(line))
-		}
-		return trimmed
-	case "split_lines":
-		if nodeType == "array" {
-			var result []string
-			for _, line := range lines {
-				fields := strings.Fields(line)
-				result = append(result, fields...)
-			}
-			return result
-		}
-		return lines
-	case "key_value":
-		if nodeType == "string" {
-			kv := make(map[string]string)
-			for _, line := range lines {
-				parts := strings.SplitN(strings.TrimSpace(line), ":", 2)
-				if len(parts) == 2 {
-					kv[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-				}
-			}
-			result := make([]string, 0, len(kv))
-			for k, v := range kv {
-				result = append(result, fmt.Sprintf("%s: %s", k, v))
-			}
-			return result
-		}
-		return lines
-	default:
-		return lines
-	}
 }
