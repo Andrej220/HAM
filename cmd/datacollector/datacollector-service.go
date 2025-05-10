@@ -1,23 +1,35 @@
 package main
 
 import (
+	"bytes"
 	"context"
-	"fmt"
 	"encoding/json"
-	"github.com/andrej220/HAM/internal/serverutil"
-	"github.com/andrej220/HAM/internal/workerpool"
- gp "github.com/andrej220/HAM/internal/graphproc"
-	"github.com/google/uuid"
-	"log"
+	"flag"
+	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 	"sync"
 	"time"
-	"bytes"
+
+	gp "github.com/andrej220/HAM/internal/graphproc"
+	"github.com/andrej220/HAM/internal/log"
+	"github.com/andrej220/HAM/internal/serverutil"
+	"github.com/andrej220/HAM/internal/workerpool"
+	"github.com/google/uuid"
+	//"go.mongodb.org/mongo-driver/internal/logger"
+)
+
+// define global flags
+var (
+    debug     = flag.Bool("debug", false, "enable debug logging")
+    logFormat = flag.String("log-format", "json", "log format: json or text")
 )
 
 const MAXTIMEOUT time.Duration = 1 * time.Minute
 const DATACOLLECTORPORT = "8081" 
 const DATASERVICEURL = "http://localhost:8082/dataservice"
+const SERVICENAME = "HAM-datacollector"
 
 type datacollectorRequest struct {
 	HostID   int `json:"hostid"`
@@ -32,14 +44,16 @@ type datacollectorHandler struct {
 	pool        *workerpool.Pool[SSHJob]
 	cancelFuncs  sync.Map
 	httpClient  *http.Client
+	logger		*slog.Logger
 }
 
-func newDatacollectorHandler() http.Handler {
+func newDatacollectorHandler(lg *slog.Logger) http.Handler {
 	h := &datacollectorHandler{
 		pool: workerpool.NewPool[SSHJob](workerpool.TotalMaxWorkers),
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
+		logger: lg,
 	}
 	return h
 }
@@ -47,7 +61,7 @@ func newDatacollectorHandler() http.Handler {
 func SendToDataservice(gr *gp.Graph, httpClient *http.Client) error {
 	// TODO: log information about the request
 	graphBytes, err := json.Marshal(gr)
-	log.Println("Request to dataservice")
+
 	if err != nil {
 		return fmt.Errorf("failed to marshal graph: %v", err)
 	}
@@ -96,6 +110,7 @@ func (h *datacollectorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request
 					if err != nil{
 						return err
 					}
+					h.logger.Info("Request to dataservice")
 					SendToDataservice(graph,h.httpClient)
 					return nil
 				},
@@ -117,19 +132,30 @@ func (h *datacollectorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request
 	rw.WriteHeader(http.StatusOK)
 	encoder := json.NewEncoder(rw)
 	if err := encoder.Encode(response); err != nil {
-		log.Printf("Failed to encode response: %v", err)
+		h.logger.Error("Failed to encode response: %v", slog.Any("err",err))
 	}
 }
 
 func main() {
+
+    cfg    := log.NewConfigFromFlags(SERVICENAME)
+    logger := log.NewLogger(cfg)
+
+	logger.Info("starting service",
+        "debug", *debug,
+        "logFormat", *logFormat,
+		"port:", DATACOLLECTORPORT,
+    )
+
 	mux := http.NewServeMux()
-	handler := newDatacollectorHandler()
+	handler := newDatacollectorHandler(logger)
 	mux.Handle("/executor", serverutil.NewValidationHandler[datacollectorRequest](handler))
 
 	config := serverutil.DefaultServerConfig()
 	config.Port = DATACOLLECTORPORT 
 	if err := serverutil.RunServer(mux, config); err != nil {
-		log.Fatalf("Failed to run server: %v", err)
+		logger.Error("Fatal error. Failed to run server: %v", slog.Any("err",err))
+		os.Exit(1)
 	}
 
 	exh := handler.(*datacollectorHandler)
