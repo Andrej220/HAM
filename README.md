@@ -1,4 +1,5 @@
 ```mermaid
+%%{init: {"config": {"look": "handDrawn", "theme": "forest"}}}%%
 graph TD
     User -->|REST API| Gateway[API Gateway]
 
@@ -26,4 +27,6 @@ graph TD
         DataService --> Monitoring
         MetadataService --> Monitoring
     end
+
+
 ```

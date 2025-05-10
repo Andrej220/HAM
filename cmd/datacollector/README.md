@@ -9,48 +9,48 @@ classDiagram
     direction TB
 
     class DataCollector {
-        -pool: WorkerPool
-        -cancelFuncs: sync.Map
-        -httpClient: HttpClient
-        +ServeHTTP()
+        - pool: WorkerPool
+        - cancelFuncs: sync.Map
+        - httpClient: HttpClient
+        + ServeHTTP()
     }
 
     class SSHJob {
-        -HostID: int
-        -ScriptID: int
-        -UUID: UUID
-        -Ctx: Context
+        - HostID: int
+        - ScriptID: int
+        - UUID: UUID
+        - Ctx: Context
     }
 
     class ResilientSSHClient {
-        -SSHClient: SSH.Client
-        -ResConf: ResilienceConfig
-        +Close()
+        - SSHClient: SSH.Client
+        - ResConf: ResilienceConfig
+        + Close()
     }
 
     class Task {
-        -node: GraphNode
-        -client: SSH.Client
-        -session: SSH.Session
-        +Run()
+        - node: GraphNode
+        - client: SSH.Client
+        - session: SSH.Session
+        + Run()
     }
 
     class WorkerPool {
-        -Jobs: Channel
-        -activeWorkers: int
-        +Submit()
-        +Stop()
+        - Jobs: Channel
+        - activeWorkers: int
+        + Submit()
+        + Stop()
     }
 
     class GraphProcessor {
-        -Config: Config
-        -Root: Node
-        +NodeGenerator()
+        - Config: Config
+        - Root: Node
+        + NodeGenerator()
     }
 
     class OutputProcessor {
-        -processors: Map
-        +Process()
+        - processors: Map
+        + Process()
     }
 
     %% Relationships
@@ -102,4 +102,5 @@ flowchart TD
         J -.-> N[OutputProcessor]
         G -.-> O[ResilientClient]
     end
+
 ```
