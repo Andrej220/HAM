@@ -1,4 +1,4 @@
-package main
+package executor
 
 import(
 		"github.com/sony/gobreaker"
