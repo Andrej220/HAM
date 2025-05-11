@@ -4,26 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"sync"
 	"time"
-
 	gp "github.com/andrej220/HAM/internal/graphproc"
-	"github.com/andrej220/HAM/internal/log"
+	"github.com/andrej220/HAM/internal/lg"
 	"github.com/andrej220/HAM/internal/serverutil"
 	"github.com/andrej220/HAM/internal/workerpool"
 	"github.com/google/uuid"
 	//"go.mongodb.org/mongo-driver/internal/logger"
-)
-
-// define global flags
-var (
-    debug     = flag.Bool("debug", false, "enable debug logging")
-    logFormat = flag.String("log-format", "json", "log format: json or text")
 )
 
 const MAXTIMEOUT time.Duration = 1 * time.Minute
@@ -44,10 +35,10 @@ type datacollectorHandler struct {
 	pool        *workerpool.Pool[SSHJob]
 	cancelFuncs  sync.Map
 	httpClient  *http.Client
-	logger		*slog.Logger
+	logger		 lg.Logger
 }
 
-func newDatacollectorHandler(lg *slog.Logger) http.Handler {
+func newDatacollectorHandler(lg lg.Logger) http.Handler {
 	h := &datacollectorHandler{
 		pool: workerpool.NewPool[SSHJob](workerpool.TotalMaxWorkers),
 		httpClient: &http.Client{
@@ -132,20 +123,15 @@ func (h *datacollectorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request
 	rw.WriteHeader(http.StatusOK)
 	encoder := json.NewEncoder(rw)
 	if err := encoder.Encode(response); err != nil {
-		h.logger.Error("Failed to encode response: %v", slog.Any("err",err))
+		h.logger.Error("Failed to encode response: %v", lg.Any("err",err))
 	}
 }
 
 func main() {
+    cfg    := lg.NewConfigFromFlags(SERVICENAME)
+    logger := lg.New(cfg)
 
-    cfg    := log.NewConfigFromFlags(SERVICENAME)
-    logger := log.NewLogger(cfg)
-
-	logger.Info("starting service",
-        "debug", *debug,
-        "logFormat", *logFormat,
-		"port:", DATACOLLECTORPORT,
-    )
+	logger.Info("starting service",lg.String("port", DATACOLLECTORPORT))
 
 	mux := http.NewServeMux()
 	handler := newDatacollectorHandler(logger)
@@ -154,7 +140,7 @@ func main() {
 	config := serverutil.DefaultServerConfig()
 	config.Port = DATACOLLECTORPORT 
 	if err := serverutil.RunServer(mux, config); err != nil {
-		logger.Error("Fatal error. Failed to run server: %v", slog.Any("err",err))
+		logger.Error("Fatal error. Failed to run server: %v", lg.Any("err",err))
 		os.Exit(1)
 	}
 
