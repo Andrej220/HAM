@@ -50,7 +50,6 @@ func (p *Pool[T]) Stop() {
 }
 
 func (p *Pool[T]) Submit( job Job[T]) {
-
 	select {
 	case p.Jobs <- job:
 		log.Printf("Job submitted with payload: %+v", job.Payload)
@@ -80,11 +79,9 @@ func (p *Pool[T]) worker(job Job[T]) {
 			job.CleanupFunc()
 		}
 	}()
-
 	log.Printf("Worker started with payload: %+v; # of workers: %d", job.Payload, atomic.LoadInt32(&p.activeWorkers))
 
 	doneCh := make(chan error, 1)
-
 	go func() {
 		var err error
 		for attempt := 1; attempt <= maxAttemps; attempt++ {
@@ -97,7 +94,6 @@ func (p *Pool[T]) worker(job Job[T]) {
 		}
 		doneCh <- fmt.Errorf("failed after 3 attempts: %w", err)
 	}()
-
 
 	select {
 	case <-job.Ctx.Done():
