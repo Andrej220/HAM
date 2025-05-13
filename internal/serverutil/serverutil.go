@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+	"github.com/andrej220/HAM/internal/lg"
 )
 
 // ServerConfig holds configuration for the HTTP server.
@@ -19,6 +19,7 @@ type ServerConfig struct {
 	WriteTimeout time.Duration
 	IdleTimeout  time.Duration
 	ShutdownTimeout time.Duration
+	Logger 	lg.Logger
 }
 
 func DefaultServerConfig() ServerConfig {
@@ -28,12 +29,15 @@ func DefaultServerConfig() ServerConfig {
 		WriteTimeout:    10 * time.Second,
 		IdleTimeout:     120 * time.Second,
 		ShutdownTimeout: 30 * time.Second,
+		Logger: nil,
 	}
 }
 
 func RunServer(handler http.Handler, config ServerConfig) error {
 	// TODO: PASS LISTENING PORT
-	// TODO: think about passing listening port with environment variable, for different services...
+	// TODO: pass listening port with environment variable, for different services...
+	logger := config.Logger
+
 	if config.Port == "" {
 		config.Port = os.Getenv("EXECUTORPORT")
 		if config.Port == "" {
@@ -53,25 +57,26 @@ func RunServer(handler http.Handler, config ServerConfig) error {
 
 	// Start server in a goroutine
 	go func() {
-		log.Printf("Server starting on port %s\n", config.Port)
+		logger.Info("Server starting", lg.String("Port",config.Port))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %v\n", err)
+			logger.Error("Server error", lg.Any("error",err))
 		}
 	}()
 
 	// Wait for interrupt signal
 	<-done
-	log.Print("Server stopping...")
+	logger.Info("Server stopping...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.ShutdownTimeout)
 	defer cancel()
 
 	// Attempt to gracefully shutdown the server
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server shutdown failed: %v", err)
+		logger.Error("Server shutdown failed", lg.Any("error",err))
+		return err
 	}
 
-	log.Print("Server stopped gracefully")
+	logger.Info("Server stopped gracefully")
 	return nil
 }
 
