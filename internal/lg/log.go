@@ -18,6 +18,7 @@ type Field = zapcore.Field
 func Any(key string, value any) Field         { return zap.Any(key, value) }
 func String(key, value string) Field          { return zap.String(key, value) }
 func Int(key string, value int) Field         { return zap.Int(key, value) }
+func Int32(key string, value int32) Field     { return zap.Int32(key, value) }
 func Bool(key string, value bool) Field       { return zap.Bool(key, value) }
 func Float64(key string, value float64) Field { return zap.Float64(key, value) }
 func Time(key string, value time.Time) Field  { return zap.Time(key, value) }
