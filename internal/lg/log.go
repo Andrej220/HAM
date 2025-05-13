@@ -10,6 +10,7 @@ import (
     "go.uber.org/zap/zapcore"
     "time"
     "bytes"
+    "slices"
 )
 
 // Field is a structured log field, aliasing zapcore.Field for flexibility.
@@ -122,8 +123,12 @@ func (d defaultLogger) With(fields ...Field) Logger {
 }
 
 func (d defaultLogger) Sync() error { return nil }
-func (d defaultLogger) Debug(msg string, fields ...Field){}
-func (d defaultLogger) Warn(msg string, fields ...Field){}
+func (d defaultLogger) Debug(msg string, fields ...Field){
+    log.Println("DEBUG:", msg, flatten(fields...))
+}
+func (d defaultLogger) Warn(msg string, fields ...Field){
+    log.Println("WARN:", msg, flatten(fields...))
+}
 
 // flattenFields converts a list of zap log fields into a space-separated string of key-value pairs.
 // The output format is "key1=value1 key2=value2 ...", similar to logfmt but using zap's encoding rules.
