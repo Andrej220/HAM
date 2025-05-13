@@ -103,7 +103,9 @@ func (z *zapLogger) Warn(msg string, fields ...Field){}
 
 
 // defaultLogger falls back to the standard log package.
-type defaultLogger struct{}
+type defaultLogger struct{
+    base []Field
+}
 
 func (d defaultLogger) Info(msg string, fields ...Field) {
     log.Println("INFO:", msg, flatten(fields...))
@@ -113,7 +115,12 @@ func (d defaultLogger) Error(msg string, fields ...Field) {
     log.Println("ERROR:", msg, flatten(fields...))
 }
 
-func (d defaultLogger) With(fields ...Field) Logger { return d }
+func (d defaultLogger) With(fields ...Field) Logger { 
+    nf := slices.Clone(d.base)     
+    nf = append(nf, fields...)     
+    return defaultLogger{base: nf}
+}
+
 func (d defaultLogger) Sync() error { return nil }
 func (d defaultLogger) Debug(msg string, fields ...Field){}
 func (d defaultLogger) Warn(msg string, fields ...Field){}
