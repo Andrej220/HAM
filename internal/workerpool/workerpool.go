@@ -2,6 +2,7 @@ package workerpool
 
 import (
 	"log"
+	"github.com/andrej220/HAM/internal/lg"
 	"sync"
 	"sync/atomic"
 	"context"
@@ -50,11 +51,14 @@ func (p *Pool[T]) Stop() {
 }
 
 func (p *Pool[T]) Submit( job Job[T]) {
+	logger := lg.FromContext(job.Ctx)
 	select {
 	case p.Jobs <- job:
-		log.Printf("Job submitted with payload: %+v", job.Payload)
+		//log.Printf("Job submitted with payload: %+v", job.Payload)
+		logger.Info("Job submitted",lg.Any("job", job.Payload) )
 	case <-p.quit:
-		log.Println("Worker pool is shutting down, job rejected")
+		logger.Info("Worker pool is shutting down, job rejected")
+		//log.Println("Worker pool is shutting down, job rejected")
 	}
 }
 
@@ -79,7 +83,11 @@ func (p *Pool[T]) worker(job Job[T]) {
 			job.CleanupFunc()
 		}
 	}()
-	log.Printf("Worker started with payload: %+v; # of workers: %d", job.Payload, atomic.LoadInt32(&p.activeWorkers))
+	logger := lg.FromContext(job.Ctx).With(lg.Any("job", job.Payload))
+	//TODO: USE WITH
+	logger.Info("Worker started with payload: %+v; # of workers: %d", 
+							//lg.Any("job",job.Payload), 
+							lg.Int32("workers", atomic.LoadInt32(&p.activeWorkers)))
 
 	doneCh := make(chan error, 1)
 	go func() {
@@ -97,13 +105,22 @@ func (p *Pool[T]) worker(job Job[T]) {
 
 	select {
 	case <-job.Ctx.Done():
-		log.Printf("Job canceled with payload: %+v, reason: %v", job.Payload, job.Ctx.Err())
+		//log.Printf("Job canceled with payload: %+v, reason: %v", job.Payload, job.Ctx.Err())
+		logger.Info("Job canceled with payload: %+v, reason: %v", 
+								//lg.Any("job",job.Payload), 
+								lg.Any("ctx.error", job.Ctx.Err()))
 	case err := <-doneCh:
 		if err != nil {
-			log.Printf("Worker error with payload %+v: %v", job.Payload, err)
+			//log.Printf("Worker error with payload %+v: %v", job.Payload, err)
+			logger.Info("Worker error with payload %+v: %v", 
+								//lg.Any("job",job.Payload), 
+								lg.Any("error", err))
 		} else {
 			log.Printf("Worker finished for job with payload: %+v; # of workers: %d",
 				job.Payload, atomic.LoadInt32(&p.activeWorkers))
+			logger.Info("Worker finished for job", 
+								//lg.Any("job",job.Payload), 
+								lg.Int32("workers", atomic.LoadInt32(&p.activeWorkers)))
 		}
 	}
 }
