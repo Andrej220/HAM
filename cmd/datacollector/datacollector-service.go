@@ -83,8 +83,7 @@ func (h *datacollectorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), MAXTIMEOUT)
+	ctx, cancel := context.WithTimeout(lg.Attach(context.Background(), h.logger), MAXTIMEOUT)
 	newUUID := uuid.New()
 
 	sshJob := SSHJob{
@@ -138,6 +137,7 @@ func main() {
 	mux.Handle("/executor", serverutil.NewValidationHandler[datacollectorRequest](handler))
 
 	config := serverutil.DefaultServerConfig()
+	config.Logger = logger
 	config.Port = DATACOLLECTORPORT 
 	if err := serverutil.RunServer(mux, config); err != nil {
 		logger.Error("Fatal error. Failed to run server: %v", lg.Any("err",err))
