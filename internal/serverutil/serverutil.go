@@ -33,13 +33,13 @@ func DefaultServerConfig() ServerConfig {
 
 func RunServer(handler http.Handler, config ServerConfig) error {
 	// TODO: PASS LISTENING PORT
+	// TODO: think about passing listening port with environment variable, for different services...
 	if config.Port == "" {
 		config.Port = os.Getenv("EXECUTORPORT")
 		if config.Port == "" {
 			config.Port = DefaultServerConfig().Port
 		}
 	}
-
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%s", config.Port),
 		Handler:      handler,
@@ -47,7 +47,6 @@ func RunServer(handler http.Handler, config ServerConfig) error {
 		WriteTimeout: config.WriteTimeout,
 		IdleTimeout:  config.IdleTimeout,
 	}
-
 	// Channel to listen for interrupt signals
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -130,8 +129,6 @@ func respondWithValidationError(rw http.ResponseWriter, err error) {
 }
 
 
-// basic validation 
 func defaultValidator[T any](req *T) error {
-	// Basic validation 
 	return nil
 }
