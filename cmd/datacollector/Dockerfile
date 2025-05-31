@@ -11,6 +11,7 @@ RUN go mod download
 COPY . .
 
 # Build the binary
+WORKDIR /app/cmd/datacollector
 RUN CGO_ENABLED=0 GOOS=linux go build -o datacollector .
 
 # Final stage
@@ -19,7 +20,6 @@ FROM alpine:latest
 # Add ca-certificates for SSH/HTTPS
 RUN apk --no-cache add ca-certificates
 
-WORKDIR /app
 COPY --from=builder /app/datacollector .
 COPY docconfig.json .
 
