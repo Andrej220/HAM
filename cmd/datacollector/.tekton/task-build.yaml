@@ -23,6 +23,7 @@ spec:
       image: gcr.io/kaniko-project/datacollector:latest
       args:
         - --context=/workspace/source/cmd/datacollector
+        - --dockerfile=cmd/datacollector/Dockerfile
         - --destination=$(params.image-name)
         - --digest-file=/workspace/source/digest.txt
         - --cache=true
