@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o ssh-executor executor.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o datacollector *.go
 
 # Final stage
 FROM alpine:latest
@@ -20,11 +20,11 @@ FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
-COPY --from=builder /app/ssh-executor .
+COPY --from=builder /app/datacollector .
 COPY docconfig.json .
 
 # Expose port
 EXPOSE 8081
 
 # Run the app
-CMD ["./ssh-executor"]
+CMD ["./datacollector"]
