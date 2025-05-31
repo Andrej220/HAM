@@ -26,4 +26,4 @@ COPY --from=builder /app/docconfig.json .
 EXPOSE 8081
 
 # Run the app
-CMD ["/app/datacollector"]
+CMD ["./datacollector"]
