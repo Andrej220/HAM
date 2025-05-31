@@ -11,7 +11,7 @@ spec:
     - name: gitops-repo
       value: "git@github.com:Andrej220/HAM-gitops.git"
     - name: image-name
-      value: "local-registry.registry.svc.cluster.local:5000/executor:latest"
+      value: "local-registry.registry.svc.cluster.local:5000/datacollector:latest"
   workspaces:
     - name: shared-data
       volumeClaimTemplate:
