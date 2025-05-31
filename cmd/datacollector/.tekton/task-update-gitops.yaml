@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: update-gitops
+  name: datacollector-update-gitops
 spec:
   params:
     - name: git-url

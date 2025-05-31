@@ -1,10 +1,10 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: ham-deploy-pipeline
+  name: datacollector-deploy-pipeline
 spec:
   params:
-    - name: ssh-executor-image-repo
+    - name: image-repo
       type: string
       description: "Git URL of the nginx-image repo"
     - name: gitops-repo
@@ -24,7 +24,7 @@ spec:
           workspace: shared-data
       params:
         - name: git-url
-          value: "$(params.ssh-executor-image-repo)"
+          value: "$(params.image-repo)"
         - name: image-name
           value: "$(params.image-name)"
 
