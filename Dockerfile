@@ -44,6 +44,7 @@ RUN mkdir -p /etc/ham
 
 # Copy binary
 COPY --from=builder /workspace/${SERVICE_NAME} /usr/local/bin/${SERVICE_NAME}
+RUN chmod +x /usr/local/bin/${SERVICE_NAME}
 # Copy runtime config
 COPY  docconfig.json /etc/ham/docconfig.json
 
