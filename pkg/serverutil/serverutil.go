@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"github.com/andrej220/HAM/internal/lg"
+	"github.com/andrej220/HAM/pkg/lg"
 )
 
 // ServerConfig holds configuration for the HTTP server.

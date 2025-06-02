@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"log"
 	"testing"
-	"github.com/andrej220/HAM/internal/persistence"
+	"github.com/andrej220/HAM/pkg/persistence"
 	"github.com/stretchr/testify/assert"
 )
 

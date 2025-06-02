@@ -1,0 +1,50 @@
+--- 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ham-test
+  labels:
+    app: ham-test
+--- 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ham-prod
+  labels:
+    app: ham-prod
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ham-test
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Andrej220/HAM-gitops.git
+    targetRevision: test
+    path: overlays/test
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ham-test
+  syncPolicy:
+    automated: {}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ham-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Andrej220/HAM-gitops.git
+    targetRevision: main
+    path: overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ham-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

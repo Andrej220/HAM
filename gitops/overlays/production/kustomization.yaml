@@ -1,0 +1,7 @@
+resources:
+  - ../../base/
+
+namespace: ham-prod
+
+patchesStrategicMerge:
+  - patches.yaml

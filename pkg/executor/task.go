@@ -2,8 +2,8 @@ package executor
 
 import (
     "context"
-    pc "github.com/andrej220/HAM/internal/processor"
-    gp "github.com/andrej220/HAM/internal/graphproc"
+    pc "github.com/andrej220/HAM/pkg/processor"
+    gp "github.com/andrej220/HAM/pkg/graphproc"
 )
 
 type NodeTask struct {

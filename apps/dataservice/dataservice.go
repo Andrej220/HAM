@@ -18,8 +18,8 @@ import (
 	//"sync"
 	time "time"
 
-	gp "github.com/andrej220/HAM/internal/graphproc"
-	"github.com/andrej220/HAM/internal/serverutil"
+	gp "github.com/andrej220/HAM/pkg/graphproc"
+	"github.com/andrej220/HAM/pkg/serverutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

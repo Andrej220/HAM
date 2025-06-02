@@ -1,0 +1,43 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-push
+spec:
+  params:
+    - name: git-url
+      type: string
+      description: "Git URL"
+    - name: serviceName
+      type: string
+      description: "Name of the microservice" 
+    - name: imageName
+      type: string
+      description: "Full image name (including registry and tag) local-registry:5000/datacollector:latest"
+    - name: servicePort
+      type: string
+      description: "Port that the service listens on"
+  workspaces:
+    - name: source
+  steps:
+    - name: clone-repo
+      image: alpine/git
+      script: |
+        #!/bin/sh
+        set -ex
+        git clone "$(params.git-url)" /workspace/source
+
+    - name: build-and-push
+      image: gcr.io/kaniko-project/executor:latest
+      # Pass SERVICE_NAME and SERVICE_PORT as build‐args; Kaniko invokes the root‐level Dockerfile
+      args:
+        - "--context=/workspace/source"
+        - "--dockerfile=/workspace/source/Dockerfile"
+        - "--destination=$(params.imageName)"
+        - "--build-arg=SERVICE_NAME=$(params.serviceName)"
+        - "--build-arg=SERVICE_PORT=$(params.servicePort)"
+        - "--digest-file=/workspace/source/digest-$(params.serviceName).txt"
+        - "--cache=true"
+        - "--verbosity=info"
+
+
+#kubectl logs -f $(kubectl get pods -l tekton.dev/taskRun=ham-deploy-run-update-gitops -o name) --all-containers

@@ -1,0 +1,33 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: HAM
+data:
+  config.json: |
+   [
+    {
+        "ip": "192.168.1.105:22",
+        "username": "master",
+        "password": "",
+        "script": "echo host 0 && ip a && echo error >&2; sleep 0"
+    },
+    {
+        "ip": "192.168.1.107:22",
+        "username": "master",
+        "password": "",
+        "script": "echo 'host 1'&& ip a && echo error!!! >&2; sleep 3"
+    },
+    {
+        "ip": "192.168.1.105:22",
+        "username": "master",
+        "password": "",
+        "script": "echo 'Host 2' && ip a; sleep 6"
+    },
+    {
+        "ip": "127.2.0.2:22",
+        "username": "andrey",
+        "password": "",
+        "script": "hostname && ip a; sleep 10"
+    }
+   ]

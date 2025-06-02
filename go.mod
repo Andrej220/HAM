@@ -2,7 +2,7 @@ module github.com/andrej220/HAM
 
 go 1.23.6
 
-replace github.com/andrej220/HAM => ../HAM
+//replace github.com/andrej220/HAM => ../HAM
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0

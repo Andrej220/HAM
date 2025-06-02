@@ -9,12 +9,12 @@ import (
 	"os"
 	"sync"
 	"time"
-	gp "github.com/andrej220/HAM/internal/graphproc"
-	"github.com/andrej220/HAM/internal/lg"
-	"github.com/andrej220/HAM/internal/serverutil"
-	"github.com/andrej220/HAM/internal/workerpool"
+	gp "github.com/andrej220/HAM/pkg/graphproc"
+	"github.com/andrej220/HAM/pkg/lg"
+	"github.com/andrej220/HAM/pkg/serverutil"
+	"github.com/andrej220/HAM/pkg/workerpool"
 	"github.com/google/uuid"
-	//"go.mongodb.org/mongo-driver/internal/logger"
+	//"go.mongodb.org/mongo-driver/pkg/logger"
 )
 
 const MAXTIMEOUT time.Duration = 1 * time.Minute

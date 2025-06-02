@@ -6,8 +6,8 @@ import (
 	"io"
 	"log"
 	"golang.org/x/sync/errgroup"
-	gp "github.com/andrej220/HAM/internal/graphproc"
-	"github.com/andrej220/HAM/internal/executor"
+	gp "github.com/andrej220/HAM/pkg/graphproc"
+	"github.com/andrej220/HAM/pkg/executor"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
 )
@@ -78,7 +78,7 @@ func (t * task)Run(script string, ctx context.Context)(stdout io.Reader, stderr 
 func loadGraphConfig(jb SSHJob)(*gp.Graph, error){
 
 	//TODO: load task from the database
-	graph, err := gp.NewGraphFromJSON("docconfig.json")
+	graph, err := gp.NewGraphFromJSON("/etc/ham/docconfig.json")
 	if err != nil {
 		log.Printf("Error reading configuration %+v", err)
 		return nil, err

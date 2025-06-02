@@ -2,7 +2,7 @@ package workerpool
 
 import (
 	"log"
-	"github.com/andrej220/HAM/internal/lg"
+	"github.com/andrej220/HAM/pkg/lg"
 	"sync"
 	"sync/atomic"
 	"context"

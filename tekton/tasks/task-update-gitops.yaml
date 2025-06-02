@@ -1,0 +1,77 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: update-gitops
+spec:
+  params:
+    - name: gitops-url
+      type: string
+      description: "SSH URL of the GitOps repo"
+    - name: serviceName
+      type: string
+      description: "Name of the microservice to patch in GitOps "
+    - name: imageName
+      type: string
+      description: "Docker image (without @digest) - local-registry:5000/datacollector:latest"
+    - name: targetEnv
+      type: string
+      description: "Overlay environment to update: 'test' or 'production'"
+      default: "test"
+  workspaces:
+    - name: source   # same workspace where build-push wrote digest-<service>.txt
+    - name: gitops   # a workspace for cloning the GitOps repo
+  volumes:
+    - name: ssh-key-volume
+      secret:
+        secretName: git-ssh-key
+        defaultMode: 0600
+  steps:
+    - name: clone-gitops
+      image: alpine/git
+      script: |
+        #!/bin/sh
+        set -ex
+        export GIT_SSH_COMMAND="ssh -i /secrets/ssh-key/ssh-privatekey -o StrictHostKeyChecking=no"
+        git clone "$(params.gitops-url)" /workspace/gitops
+        cd /workspace/gitops
+        git checkout $(params.targetEnv)    
+      volumeMounts:
+        - name: ssh-key-volume
+          mountPath: /secrets/ssh-key
+          readOnly: true
+
+    - name: patch-overlay
+      image: alpine/kustomize:latest
+      script: |
+        #!/bin/sh
+        set -ex
+        cd /workspace/gitops/overlays/$(params.targetEnv)
+
+        # Read the image digest that build-push wrote
+        DIGEST="$(cat /workspace/source/digest-$(params.serviceName).txt)"
+        if [ -z "$DIGEST" ]; then
+          echo "❌ ERROR: /workspace/source/digest-$(params.serviceName).txt is empty!"
+          exit 1
+        fi
+        kustomize edit set image $(params.serviceName)=$(params.imageName)@${DIGEST}
+
+    - name: commit-and-push
+      image: alpine/git
+      script: |
+        #!/bin/sh
+        set -ex
+        cd /workspace/gitops
+        git config --global user.email "tekton@mail.com"
+        git config --global user.name "Tekton Pipeline"
+        git add .
+        git commit -m "[$(params.targetEnv)] update $(params.serviceName) → $(params.imageName)@${DIGEST}"
+        export GIT_SSH_COMMAND="ssh -i /secrets/ssh-key/ssh-privatekey -o StrictHostKeyChecking=no"
+        git push origin $(params.targetEnv)
+      volumeMounts:
+        - name: ssh-key-volume
+          mountPath: /secrets/ssh-key
+          readOnly: true
+
+
+
+#kubectl logs -l tekton.dev/pipelineRun=nginx-deploy-run --all-containers=true

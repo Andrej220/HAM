@@ -1,0 +1,66 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: microservice-deploy-pipeline
+spec:
+  params:
+    - name: git-url
+      type: string
+      description: "Git URL"
+    - name: gitops-url
+      type: string
+      description: "SSH URL of the GitOps repo "
+    - name: serviceName
+      type: string
+      description: "Name of the microservice"
+    - name: imageName
+      type: string
+      description: "Full image name (including registry and tag) - local-registry:5000/datacollector:latest"
+    - name: targetEnv
+      type: string
+      description: "Overlay environment to update in GitOps: 'test' or 'production'"
+    - name: servicePort
+      type: string
+      description: "Port that the service listens on "
+      default: "8081"
+  workspaces:
+    - name: shared-data
+      description: "A workspace for cloning the repo and storing digest files"
+    - name: gitops-data
+      description: "A workspace for cloning the GitOps repo"
+  tasks:
+    - name: build-push
+      taskRef:
+        name: build-push
+      params:
+        - name: git-url
+          value: "$(params.git-url)"
+        - name: serviceName
+          value: "$(params.serviceName)"
+        - name: imageName
+          value: "$(params.imageName)"
+        - name: servicePort
+          value: "$(params.servicePort)"
+      workspaces:
+        - name: source
+          workspace: shared-data
+
+    - name: update-gitops
+      runAfter:
+        - build-push
+      taskRef:
+        name: update-gitops
+      params:
+        - name: gitops-url
+          value: "$(params.gitops-url)"
+        - name: serviceName
+          value: "$(params.serviceName)"
+        - name: imageName
+          value: "$(params.imageName)"
+        - name: targetEnv
+          value: "$(params.targetEnv)"
+      workspaces:
+        - name: source
+          workspace: shared-data
+        - name: gitops
+          workspace: gitops-data

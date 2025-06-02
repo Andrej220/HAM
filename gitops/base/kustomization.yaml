@@ -1,0 +1,13 @@
+resources:
+- deployment.yaml
+- service.yaml
+- datacollector-service.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+  - name: datacollector
+    newName: local-registry.registry.svc.cluster.local:5000/datacollector
+    newTag: latest
+  - name: nginx/nginx-prometheus-exporter
+    newName: nginx/nginx-prometheus-exporter
+    newTag: latest
