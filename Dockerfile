@@ -57,4 +57,4 @@ RUN echo "Service binary: /usr/local/bin/${SERVICE_NAME}" && \
     ls -la /usr/local/bin/
 
 # Entry point
-RUN /usr/local/bin/${SERVICE_NAME}
+CMD /usr/local/bin/${SERVICE_NAME}
