@@ -35,6 +35,9 @@ RUN cd apps/${SERVICE_NAME} && \
 
 FROM alpine:latest
 
+ARG SERVICE_NAME
+ARG SERVICE_PORT
+
 # Add ca-certificates for SSH/HTTPS
 RUN apk --no-cache add ca-certificates
 RUN mkdir -p /etc/ham
