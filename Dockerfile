@@ -19,7 +19,7 @@ COPY go.mod go.sum ./
 COPY pkg ./pkg
 
 # Copy only the service folder
-COPY apps/${SERVICE_NAME} ./apps/${SERVICE_NAME}
+COPY . .
 
 # Download modules 
 RUN go mod download
