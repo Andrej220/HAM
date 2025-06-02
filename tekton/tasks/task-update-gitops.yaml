@@ -34,14 +34,17 @@ spec:
         export GIT_SSH_COMMAND="ssh -i /secrets/ssh-key/ssh-privatekey -o StrictHostKeyChecking=no"
         git clone "$(params.gitops-url)" /workspace/gitops
         cd /workspace/gitops
-        git checkout $(params.targetEnv)    
+        git checkout $(params.targetEnv) 
+        echo "Git status after checkout:"
+        git status
+ 
       volumeMounts:
         - name: ssh-key-volume
           mountPath: /secrets/ssh-key
           readOnly: true
 
     - name: patch-overlay
-      image: alpine/kustomize:latest
+      image: gcr.io/kustomize/kustomize:v5.4.2
       script: |
         #!/bin/sh
         set -ex
@@ -54,6 +57,8 @@ spec:
           exit 1
         fi
         kustomize edit set image $(params.serviceName)=$(params.imageName)@${DIGEST}
+        echo "Kustomization file after edit:"
+        cat kustomization.yaml
 
     - name: commit-and-push
       image: alpine/git
@@ -63,10 +68,13 @@ spec:
         cd /workspace/gitops
         git config --global user.email "tekton@mail.com"
         git config --global user.name "Tekton Pipeline"
+        echo "Git status before commit:"
+        git status
         git add .
         git commit -m "[$(params.targetEnv)] update $(params.serviceName) → $(params.imageName)@${DIGEST}"
         export GIT_SSH_COMMAND="ssh -i /secrets/ssh-key/ssh-privatekey -o StrictHostKeyChecking=no"
         git push origin $(params.targetEnv)
+        git status
       volumeMounts:
         - name: ssh-key-volume
           mountPath: /secrets/ssh-key
@@ -75,3 +83,5 @@ spec:
 
 
 #kubectl logs -l tekton.dev/pipelineRun=nginx-deploy-run --all-containers=true
+#kubectl get events --field-selector involvedObject.name=datacollector-deploy-to-test-update-gitops
+#kubectl logs -f $(kubectl get pods -l tekton.dev/taskRun=datacollector-deploy-to-test-update-gitops -o name --no-headers) --all-containers

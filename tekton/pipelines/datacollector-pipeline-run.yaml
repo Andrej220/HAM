@@ -30,12 +30,5 @@ spec:
             requests:
               storage: 1Gi
     - name: gitops-data
-      volumeClaimTemplate:
-        metadata:
-          name: "pipeline-gitops-workspace"
-        spec:
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 1Gi
+      emptyDir: {}
 
