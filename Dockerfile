@@ -48,4 +48,4 @@ COPY  docconfig.json /etc/ham/docconfig.json
 EXPOSE ${SERVICE_PORT}
 
 # Entry point
-ENTRYPOINT ["/usr/local/bin/"${SERVICE_NAME}]
+ENTRYPOINT [/usr/local/bin/${SERVICE_NAME}]
