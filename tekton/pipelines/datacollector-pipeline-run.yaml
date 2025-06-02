@@ -3,6 +3,7 @@ kind: PipelineRun
 metadata:
   name: datacollector-deploy-to-test
 spec:
+  timeout: 1h0m0s
   pipelineRef:
     name: microservice-deploy-pipeline
   params:
@@ -22,7 +23,7 @@ spec:
     - name: shared-data
       volumeClaimTemplate:
         metadata:
-          name: pipeline-workspace
+          name: "pipeline-workspace"
         spec:
           accessModes: ["ReadWriteOnce"]
           resources:
@@ -31,7 +32,7 @@ spec:
     - name: gitops-data
       volumeClaimTemplate:
         metadata:
-          name: pipeline-gitops-workspace
+          name: "pipeline-gitops-workspace"
         spec:
           accessModes: ["ReadWriteOnce"]
           resources:
