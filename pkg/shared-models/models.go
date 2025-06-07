@@ -10,7 +10,7 @@ type Request struct {
 	ScriptID int `json:"scriptid"`
 }
 
-type datacollectorResponse struct {
+type Response struct {
 	ExecutionUID uuid.UUID `json:"exuid"`
 }
 
