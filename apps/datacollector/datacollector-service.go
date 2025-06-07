@@ -15,12 +15,13 @@ import (
 	"github.com/andrej220/HAM/pkg/workerpool"
 	"github.com/google/uuid"
 	//"go.mongodb.org/mongo-driver/pkg/logger"
+//	"github.com/andrej220/HAM/pkg/shared-models/models.go"
 )
 
 const MAXTIMEOUT time.Duration = 1 * time.Minute
-const DATACOLLECTORPORT = "8081" 
 const DATASERVICEURL = "http://localhost:8082/dataservice"
 const SERVICENAME = "HAM-datacollector"
+const SERVICEPORT = "8081" 
 
 type datacollectorRequest struct {
 	HostID   int `json:"hostid"`
@@ -130,17 +131,16 @@ func main() {
     cfg    := lg.NewConfigFromFlags(SERVICENAME)
     logger := lg.New(cfg)
 
-	logger.Info("starting service",lg.String("port", DATACOLLECTORPORT))
-
 	mux := http.NewServeMux()
+	logger.Info("starting service",lg.String("port", SERVICEPORT))
 	handler := newDatacollectorHandler(logger)
 	mux.Handle("/executor", serverutil.NewValidationHandler[datacollectorRequest](handler))
 
 	config := serverutil.DefaultServerConfig()
 	config.Logger = logger
-	config.Port = DATACOLLECTORPORT 
 	if err := serverutil.RunServer(mux, config); err != nil {
 		logger.Error("Fatal error. Failed to run server: %v", lg.Any("err",err))
+		config.Port = SERVICEPORT 
 		os.Exit(1)
 	}
 
