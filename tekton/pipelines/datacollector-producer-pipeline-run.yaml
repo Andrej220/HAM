@@ -1,0 +1,34 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: datacollectorProducer-deploy-to-test
+spec:
+  timeout: 0h15m0s
+  pipelineRef:
+    name: microservice-deploy-pipeline
+  params:
+    - name: git-url
+      value: "https://github.com/Andrej220/HAM.git"
+    - name: gitops-url
+      value: "git@github.com:Andrej220/HAM-gitops.git"
+    - name: serviceName
+      value: "datacollectorProducer"
+    - name: imageName
+      value: "local-registry.registry.svc.cluster.local:5000/datacollectorProducer:latest"
+    - name: targetEnv
+      value: "test"
+    - name: servicePort
+      value: "8083"
+  workspaces:
+    - name: shared-data
+      volumeClaimTemplate:
+        metadata:
+          name: "pipeline-workspace"
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+    - name: gitops-data
+      emptyDir: {}
+
