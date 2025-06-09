@@ -9,28 +9,20 @@ import (
 	"os"
 	"sync"
 	"time"
-	gp "github.com/andrej220/HAM/pkg/graphproc"
 	"github.com/andrej220/HAM/pkg/lg"
 	"github.com/andrej220/HAM/pkg/serverutil"
 	"github.com/andrej220/HAM/pkg/workerpool"
+
+	gp "github.com/andrej220/HAM/pkg/graphproc"
+	dm "github.com/andrej220/HAM/pkg/shared-models"
 	"github.com/google/uuid"
 	//"go.mongodb.org/mongo-driver/pkg/logger"
-//	"github.com/andrej220/HAM/pkg/shared-models/models.go"
 )
 
 const MAXTIMEOUT time.Duration = 1 * time.Minute
 const DATASERVICEURL = "http://localhost:8082/dataservice"
 const SERVICENAME = "HAM-datacollector"
 const SERVICEPORT = "8081" 
-
-type datacollectorRequest struct {
-	HostID   int `json:"hostid"`
-	ScriptID int `json:"scriptid"`
-}
-
-type datacollectorResponse struct {
-	ExecutionUID uuid.UUID `json:"exuid"`
-}
 
 type datacollectorHandler struct {
 	pool        *workerpool.Pool[SSHJob]
@@ -79,7 +71,7 @@ func SendToDataservice(gr *gp.Graph, httpClient *http.Client) error {
 }
 
 func (h *datacollectorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	request, ok := r.Context().Value("request").(datacollectorRequest)
+	request, ok := r.Context().Value("request").(dm.Request)
 	if !ok {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
@@ -116,7 +108,7 @@ func (h *datacollectorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request
 
 	h.cancelFuncs.Store(newUUID, cancel)
 	h.pool.Submit(jb)
-	response := datacollectorResponse{ExecutionUID: newUUID}
+	response := dm.Response{ExecutionUID: newUUID}
 
 	// TODO: think about the response
 	rw.Header().Set("Content-Type", "application/json")
@@ -134,7 +126,7 @@ func main() {
 	mux := http.NewServeMux()
 	logger.Info("starting service",lg.String("port", SERVICEPORT))
 	handler := newDatacollectorHandler(logger)
-	mux.Handle("/executor", serverutil.NewValidationHandler[datacollectorRequest](handler))
+	mux.Handle("/executor", serverutil.NewValidationHandler[dm.Request](handler))
 
 	config := serverutil.DefaultServerConfig()
 	config.Logger = logger
