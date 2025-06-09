@@ -1,6 +1,6 @@
 // recives API requests and put in Kafka queue
 
-package producer
+package main
 
 import(
 	"net/http"
