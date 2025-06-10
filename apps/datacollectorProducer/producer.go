@@ -85,7 +85,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 	//h.lg.Info("prepare to send message")
 	err = h.producer.writer.WriteMessages(ctx,
 		kafka.Message{
-			Key:   request.ExecutionUID[:], 			// TODO:  add uuid 
+			Key:   request.ExecutionUID[:],  
 			Value: message,
 			Time:  time.Now(),
 		},
