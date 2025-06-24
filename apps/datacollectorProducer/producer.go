@@ -7,6 +7,7 @@ import(
 	"github.com/andrej220/HAM/pkg/lg"
 	"github.com/andrej220/HAM/pkg/serverutil"
 	"os"
+	"github.com/caarlos0/env/v6"
 	"context"
 	"time"
 	dm "github.com/andrej220/HAM/pkg/shared-models"
@@ -21,9 +22,12 @@ const (
 	servicePort    = "8083"
 	HTTPpath       = "/datacollectorProducer"
 	MAXTIMEOUT     time.Duration = 2 * time.Minute
-	kafkaTopic     = "remote-requests" 
-	kafkaBrokers   = "localhost:9092"
 )
+
+type Config struct {
+    KafkaBrokers string `env:"KAFKA_BROKERS" envDefault:"kafka.kafka.svc.cluster.local:9092"`
+    KafkaTopic   string `env:"KAFKA_TOPIC" envDefault:"remote-requests"`
+}
 
 type messageWriter interface {
     WriteMessages(context.Context, ...kafka.Message) error
@@ -41,11 +45,11 @@ type Handler struct{
 	lg 			lg.Logger
 }
 
-func newKafkaProducer(lg lg.Logger) *Producer {
+func newKafkaProducer(lg lg.Logger, cfg Config) *Producer {
 	return &Producer{
 		writer: &kafka.Writer{
-			Addr:     kafka.TCP(kafkaBrokers),
-			Topic:    kafkaTopic,
+			Addr:     kafka.TCP(cfg.KafkaBrokers),
+			Topic:    cfg.KafkaTopic,
 			Balancer: &kafka.LeastBytes{},
 			Async:    false, 
 			AllowAutoTopicCreation: true,
@@ -54,8 +58,8 @@ func newKafkaProducer(lg lg.Logger) *Producer {
 	}
 }
 
-func newProducerHandler(lg lg.Logger) http.Handler {
-	producer := newKafkaProducer(lg)
+func newProducerHandler(cfg  Config, lg lg.Logger) http.Handler {
+	producer := newKafkaProducer(lg, cfg)
 	handler := &Handler{
 		producer: producer,
 		lg:       lg,
@@ -95,7 +99,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 	if err != nil {
 		if errors.Is(err, kafka.UnknownTopicOrPartition) {
 			h.lg.Error("Kafka topic does not exist", 
-				lg.String("topic", kafkaTopic),
+				//lg.String("topic", kafkaTopic),
 				lg.String("action", "Create the topic manually or enable auto-creation"))
 		}
 		http.Error(rw, "Failed to process request", http.StatusInternalServerError)
@@ -108,13 +112,18 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 
 
 func main(){
-    cfg    := lg.NewConfigFromFlags(serviceName)
-    logger := lg.New(cfg)
+	cfg    := lg.NewConfigFromFlags(serviceName)
+	logger := lg.New(cfg)
+
+	var kafkaCfg Config
+	if err := env.Parse(&kafkaCfg); err != nil {
+        logger.Error("failed to parse config: %v", lg.Any("error", err))
+    }
 
 	logger.Info("starting service ", lg.String("str",serviceName), lg.String("port", servicePort))
 
 	mux := http.NewServeMux()
-	handler := newProducerHandler(logger)
+	handler := newProducerHandler(kafkaCfg, logger)
 	mux.Handle(HTTPpath, serverutil.NewValidationHandler[dm.Request](handler))
 
 	config := serverutil.DefaultServerConfig()
