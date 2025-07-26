@@ -1,7 +1,7 @@
 package workerpool
 
 import (
-	"log"
+	//"log"
 	"github.com/andrej220/HAM/pkg/lg"
 	"sync"
 	"sync/atomic"
@@ -116,11 +116,11 @@ func (p *Pool[T]) worker(job Job[T]) {
 								//lg.Any("job",job.Payload), 
 								lg.Any("error", err))
 		} else {
-			log.Printf("Worker finished for job with payload: %+v; # of workers: %d",
-				job.Payload, atomic.LoadInt32(&p.activeWorkers))
-			logger.Info("Worker finished for job", 
-								//lg.Any("job",job.Payload), 
-								lg.Int32("workers", atomic.LoadInt32(&p.activeWorkers)))
+//			log.Printf("Worker finished job with payload: %+v; # of workers: %d",
+//				job.Payload, atomic.LoadInt32(&p.activeWorkers))
+			logger.Info(fmt.Sprintf("Worker finished for job %+v: %v ", 
+								lg.Any("job",job.Payload), 
+								lg.Int32("workers", atomic.LoadInt32(&p.activeWorkers))) )
 		}
 	}
 }
