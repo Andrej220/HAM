@@ -85,9 +85,9 @@ func (p *Pool[T]) worker(job Job[T]) {
 	}()
 	logger := lg.FromContext(job.Ctx).With(lg.Any("job", job.Payload))
 	//TODO: USE WITH
-	logger.Info("Worker started with payload: %+v; # of workers: %d", 
-							//lg.Any("job",job.Payload), 
-							lg.Int32("workers", atomic.LoadInt32(&p.activeWorkers)))
+	logger.Info(fmt.Sprintf("Worker started with payload: %+v; # of workers: %v", 
+			lg.Any("job",job.Payload), 
+			atomic.LoadInt32(&p.activeWorkers)) )
 
 	doneCh := make(chan error, 1)
 	go func() {
@@ -106,15 +106,15 @@ func (p *Pool[T]) worker(job Job[T]) {
 	select {
 	case <-job.Ctx.Done():
 		//log.Printf("Job canceled with payload: %+v, reason: %v", job.Payload, job.Ctx.Err())
-		logger.Info("Job canceled with payload: %+v, reason: %v", 
-								//lg.Any("job",job.Payload), 
-								lg.Any("ctx.error", job.Ctx.Err()))
+		logger.Info( fmt.Sprintf("Job canceled with payload: %+v, reason: %v", 
+								lg.Any("job",job.Payload), 
+								job.Ctx.Err()) )
 	case err := <-doneCh:
 		if err != nil {
 			//log.Printf("Worker error with payload %+v: %v", job.Payload, err)
-			logger.Info("Worker error with payload %+v: %v", 
-								//lg.Any("job",job.Payload), 
-								lg.Any("error", err))
+			logger.Info(fmt.Sprintf("Worker error with payload %+v: %v", 
+								lg.Any("job",job.Payload), 
+								lg.Any("error", err)) )
 		} else {
 //			log.Printf("Worker finished job with payload: %+v; # of workers: %d",
 //				job.Payload, atomic.LoadInt32(&p.activeWorkers))
