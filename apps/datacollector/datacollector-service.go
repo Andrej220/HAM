@@ -6,16 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
+	//"os"
 	"sync"
 	"time"
 	"github.com/andrej220/HAM/pkg/lg"
-	"github.com/andrej220/HAM/pkg/serverutil"
+	//"github.com/andrej220/HAM/pkg/serverutil"
+	ku "github.com/andrej220/HAM/pkg/kafkautil"
+	//"github.com/segmentio/kafka-go"
 	"github.com/andrej220/HAM/pkg/workerpool"
 
 	gp "github.com/andrej220/HAM/pkg/graphproc"
 	dm "github.com/andrej220/HAM/pkg/shared-models"
-	"github.com/google/uuid"
 	//"go.mongodb.org/mongo-driver/pkg/logger"
 )
 
@@ -31,7 +32,7 @@ type datacollectorHandler struct {
 	logger		 lg.Logger
 }
 
-func newDatacollectorHandler(lg lg.Logger) http.Handler {
+func newDatacollectorHandler(lg lg.Logger) *datacollectorHandler {
 	h := &datacollectorHandler{
 		pool: workerpool.NewPool[SSHJob](workerpool.TotalMaxWorkers),
 		httpClient: &http.Client{
@@ -70,19 +71,61 @@ func SendToDataservice(gr *gp.Graph, httpClient *http.Client) error {
 	return nil
 }
 
-func (h *datacollectorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	request, ok := r.Context().Value("request").(dm.Request)
-	if !ok {
-		http.Error(rw, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	ctx, cancel := context.WithTimeout(lg.Attach(context.Background(), h.logger), MAXTIMEOUT)
-	newUUID := uuid.New()
+//func (h *datacollectorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+//	request, ok := r.Context().Value("request").(dm.Request)
+//	if !ok {
+//		http.Error(rw, "Internal server error", http.StatusInternalServerError)
+//		return
+//	}
+//	ctx, cancel := context.WithTimeout(lg.Attach(context.Background(), h.logger), MAXTIMEOUT)
+//	newUUID := uuid.New()
+//
+//	sshJob := SSHJob{
+//		HostID:   request.HostID,
+//		ScriptID: request.ScriptID,
+//		UUID:     newUUID,
+//		Ctx:      ctx,
+//	}
+//
+//	jb := workerpool.Job[SSHJob]{
+//		Payload: sshJob,
+//		Fn:     func(j SSHJob) error {
+//					graph, err := RunJob(j)
+//					if err != nil{
+//						return err
+//					}
+//					h.logger.Info("Request to dataservice")
+//					SendToDataservice(graph,h.httpClient)
+//					return nil
+//				},
+//		Ctx:     ctx,
+//		CleanupFunc: func() {
+//			if cancel, ok := h.cancelFuncs.Load(newUUID); ok {
+//				cancel.(context.CancelFunc)()
+//				h.cancelFuncs.Delete(newUUID)
+//			}
+//		},
+//	}
+
+//	h.cancelFuncs.Store(newUUID, cancel)
+//	h.pool.Submit(jb)
+//	response := dm.Response{ExecutionUID: newUUID}
+//
+//	// TODO: think about the response
+//	rw.Header().Set("Content-Type", "application/json")
+//	rw.WriteHeader(http.StatusOK)
+//	encoder := json.NewEncoder(rw)
+//	if err := encoder.Encode(response); err != nil {
+//		h.logger.Error("Failed to encode response: %v", lg.Any("err",err))
+//	}
+//}
+
+func Serve(data dm.Request, h *datacollectorHandler, ctx context.Context ) {
 
 	sshJob := SSHJob{
-		HostID:   request.HostID,
-		ScriptID: request.ScriptID,
-		UUID:     newUUID,
+		HostID:   data.HostID,
+		ScriptID: data.ScriptID,
+		UUID:     data.ExecutionUID,
 		Ctx:      ctx,
 	}
 
@@ -93,49 +136,54 @@ func (h *datacollectorHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request
 					if err != nil{
 						return err
 					}
-					h.logger.Info("Request to dataservice")
+					//logger.Info("Request to dataservice")
 					SendToDataservice(graph,h.httpClient)
 					return nil
 				},
 		Ctx:     ctx,
 		CleanupFunc: func() {
-			if cancel, ok := h.cancelFuncs.Load(newUUID); ok {
+			if cancel, ok := h.cancelFuncs.Load(data.ExecutionUID); ok {
 				cancel.(context.CancelFunc)()
-				h.cancelFuncs.Delete(newUUID)
+				h.cancelFuncs.Delete(data.ExecutionUID)
 			}
 		},
 	}
-
-	h.cancelFuncs.Store(newUUID, cancel)
 	h.pool.Submit(jb)
-	response := dm.Response{ExecutionUID: newUUID}
-
-	// TODO: think about the response
-	rw.Header().Set("Content-Type", "application/json")
-	rw.WriteHeader(http.StatusOK)
-	encoder := json.NewEncoder(rw)
-	if err := encoder.Encode(response); err != nil {
-		h.logger.Error("Failed to encode response: %v", lg.Any("err",err))
-	}
 }
 
 func main() {
     cfg    := lg.NewConfigFromFlags(SERVICENAME)
     logger := lg.New(cfg)
+	handler := newDatacollectorHandler(logger) 
 
-	mux := http.NewServeMux()
-	logger.Info("starting service",lg.String("port", SERVICEPORT))
-	handler := newDatacollectorHandler(logger)
-	mux.Handle("/executor", serverutil.NewValidationHandler[dm.Request](handler))
+    consumerCfg := ku.Config{
+        Brokers: []string{
+			"hev095wvtq2.sn.mynetname.net:31990",
+			"hev095wvtq2.sn.mynetname.net:31991",
+			"hev095wvtq2.sn.mynetname.net:31992",
+		},
+        Topic:   "orders",
+        GroupID: "order-service",
+    }
+	fmt.Println("Kafka brokers:", consumerCfg.Brokers)
+	cons := ku.NewConsumer[dm.Request](consumerCfg)
+	defer cons.Close()	
 
-	config := serverutil.DefaultServerConfig()
-	config.Logger = logger
-	if err := serverutil.RunServer(mux, config); err != nil {
-		logger.Error("Fatal error. Failed to run server: %v", lg.Any("err",err))
-		config.Port = SERVICEPORT 
-		os.Exit(1)
+	// TODO: add cancel function to shutdown the service gracefully
+	// TODO: catch ctrl+c signal 
+	ctx := context.Background()
+	for {
+		order, err := cons.Read(ctx)
+		if (err != nil){
+			logger.Error("error", lg.Any("err",err))
+			time.Sleep(time.Second)
+			continue
+		}
+		logger.Debug("Recieved msg",lg.Any("order",order))
+		fmt.Println("Recieved msg:", order)
+		Serve(order, handler, ctx)
 	}
-
-	exh := handler.(*datacollectorHandler)
-	exh.pool.Stop()
+	//handler := newDatacollectorHandler(logger)
+	//exh := handler.(*datacollectorHandler)
+	//exh.pool.Stop()
 }
