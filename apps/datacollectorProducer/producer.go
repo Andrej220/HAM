@@ -1,4 +1,5 @@
 // recives API requests and put in Kafka queue
+//root@test-pod:/# curl -X GET https://10.42.0.160:8083/datacollectorProducer -d '{"hostid": 2,"scriptid": 2}'
 
 package main
 
