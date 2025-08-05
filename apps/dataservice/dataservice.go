@@ -1,21 +1,12 @@
 package main
 
 import (
-	//"encoding/json"
-	//"fmt"
 	"context"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
-
-	//"time"
-	//"os/signal"
-	//"syscall"
-	//"os"
-	//"github.com/google/uuid"
-	//"sync"
 	time "time"
 
 	gp "github.com/andrej220/HAM/pkg/graphproc"
@@ -23,13 +14,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/andrej220/HAM/pkg/config"
 )
 
 // TODO: implement api function to initialize MongoDB
 
-const DATASERVICEPORT = "8082"
-const ENDPOINT = "/dataservice"
-const MongoDBURI = "mongodb://root:BnJlZJ7DOy@localhost:27017/appdb?authSource=admin"
 const mongoDBCollection = "mycollection"
 const mongoDBDatabase = "appdb"
 
@@ -45,11 +34,13 @@ type dataserviceResponse struct {
 
 type dataserviceHandler struct {
 	mongodbClient *mongo.Client
+	dbConf * DBConfig
 }
 
-func NewDataserviceHandler(mdbClient *mongo.Client) *dataserviceHandler {
+func NewDataserviceHandler(mdbClient *mongo.Client, dbconf *DBConfig) *dataserviceHandler {
 	return &dataserviceHandler{
 		mongodbClient: mdbClient,
+		dbConf: dbconf,
 	}
 }
 
@@ -59,17 +50,6 @@ type DataServiceRequest struct {
     ConfigUUID string           `json:"configUUID"`
     Output     *gp.Node  		`json:"output"`
     ExecutedAt time.Time        `json:"executedAt"`
-}
-func SaveDataCollection(payload gp.Graph, client mongo.Client, ctx context.Context ) error{
-	collection := client.Database(mongoDBDatabase).Collection(mongoDBCollection)
-	opt := SaveOptions{
-		Overwrite: 	true,
-		Prefix:    	strconv.Itoa(payload.HostCfg.CustomerID),
-		Id:     	strconv.Itoa(payload.HostCfg.HostID),
-		UUID:    	payload.UUID.String(),
-	}  
-	SaveToMongo( payload, collection, opt)
-	return nil
 }
 
 // SaveToMongo saves data to a MongoDB collection.
@@ -146,18 +126,21 @@ func (h *dataserviceHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 		return
 	}
 	
-	collection := h.mongodbClient.Database(mongoDBDatabase).Collection(mongoDBCollection)
+	collection := h.mongodbClient.Database(h.dbConf.MongoDBName).Collection(h.dbConf.MongoCollection)
 	opt := SaveOptions{
 		Overwrite: true,
 		Prefix:    "",
 		Id:        strconv.Itoa(request.HostCfg.HostID),
 		UUID: 	   request.UUID.String(),
 	}
-	SaveToMongo(request, collection, opt)
+	err := SaveToMongo(request, collection, opt)
+	if err != nil {
+		log.Printf("Failed saving to MongoDB %v:", err)
+	}
 
 }
 
-func dbinitialize() (*mongo.Client, error) {
+func dbinitialize(MongoDBURI string) (*mongo.Client, error) {
 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(MongoDBURI))
 	if err != nil {
 		log.Fatalf("Failed to connect to MongoDB: %v, check DBURI", err)
@@ -181,9 +164,27 @@ func dbCloseConnection(client *mongo.Client) {
 	log.Println("Disconnected from MongoDB")	
 }
 
+func initConfig(path string)(*DataserviceConfig, error){
+	store, err := config.NewStore(config.FileStore, &config.FileConfig{Path: path})
+    if err != nil {
+        return nil, err
+    }
+    var cfg DataserviceConfig
+    if err := store.Load(&cfg); err != nil {
+        return nil, err
+    }
+    return &cfg, nil
+}
+
 func main() {
+	
+	cfg, err := initConfig("./apps/datacollector/config.yaml")
+	if err != nil {
+		log.Fatalf("Failed to setup configuration, %v", err)
+	}
+
 	// TODO: establish connection to PostgreSQL
-	mdbClient, err := dbinitialize()
+	mdbClient, err := dbinitialize(cfg.DB.MongoURI)
 	if err != nil {
 		log.Fatalf("Failed to initialize MongoDB: %v", err)
 		return
@@ -191,10 +192,10 @@ func main() {
 	defer dbCloseConnection(mdbClient)
 	
 	mux := http.NewServeMux()
-	handler := NewDataserviceHandler(mdbClient)
-	mux.Handle(ENDPOINT, serverutil.NewValidationHandler[gp.Graph](handler,gp.ValidateGraph))
+	handler := NewDataserviceHandler(mdbClient, &cfg.DB.DBConf)
+	mux.Handle(cfg.Server.Endpoint, serverutil.NewValidationHandler[gp.Graph](handler,gp.ValidateGraph))
 	config:= serverutil.DefaultServerConfig()
-	config.Port = DATASERVICEPORT
+	config.Port = cfg.Server.Port
 	serverutil.RunServer(mux, config)
 
 	// TODO: implement graceful DB shutdown

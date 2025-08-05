@@ -1,0 +1,9 @@
+server:
+  port: "8082"
+  endpoint: "/dataservice"
+
+db:
+  mongoURI: "mongodb://root:BnJlZJ7DOy@localhost:27017/appdb?authSource=admin"
+  dbConf:
+    mongoCollection: "mycollection"
+    mongoDBName: "appdb"
