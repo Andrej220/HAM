@@ -44,7 +44,7 @@ spec:
           readOnly: true
 
     - name: patch-overlay
-      image: gcr.io/kustomize/kustomize:v5.4.2
+      image: registry.k8s.io/kustomize/kustomize:v5.4.2
       script: |
         #!/bin/sh
         set -ex
