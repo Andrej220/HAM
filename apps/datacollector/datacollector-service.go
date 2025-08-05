@@ -8,10 +8,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"syscall"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
+
+	"github.com/andrej220/HAM/pkg/config"
 	"github.com/andrej220/HAM/pkg/lg"
+
 	//"github.com/andrej220/HAM/pkg/serverutil"
 	ku "github.com/andrej220/HAM/pkg/kafkautil"
 	//"github.com/segmentio/kafka-go"
@@ -104,20 +108,40 @@ func Serve(data dm.Request, h *datacollectorHandler, ctx context.Context ) {
 	h.pool.Submit(jb)
 }
 
-func main() {
-	cfg := lg.NewConfigFromFlags(SERVICENAME)
-	logger := lg.New(cfg)
-	handler := newDatacollectorHandler(logger)
+func initConfig(path string)(*DataCollectorConfig, error){
+	store, err := config.NewStore(config.FileStore, &config.FileConfig{Path: path})
+    if err != nil {
+        return nil, err
+    }
+    var cfg DataCollectorConfig
+    if err := store.Load(&cfg); err != nil {
+        return nil, err
+    }
+    return &cfg, nil
+}
 
-	consumerCfg := ku.Config{
-		Brokers: []string{
-			"hev095wvtq2.sn.mynetname.net:31990",
-			"hev095wvtq2.sn.mynetname.net:31991",
-			"hev095wvtq2.sn.mynetname.net:31992",
-		},
-		Topic:   "orders",
-		GroupID: "order-service",
+func main() {
+	loggercfg := lg.NewConfigFromFlags(SERVICENAME)
+	logger := lg.New(loggercfg)
+	handler := newDatacollectorHandler(logger)
+	
+	// Load configuration of the microservice
+	cfg, err := initConfig("./apps/datacollector/config.yaml")
+	if err != nil {
+		logger.Error("Failed to setup configuration", lg.Any("error",err))
 	}
+	
+	// Set up Kafka consumer
+	consumerCfg := ku.Config{
+		Brokers: cfg.Kafka.Brokers,
+		Topic:   cfg.Kafka.Topic,
+		GroupID: cfg.Kafka.GroupID,
+	}
+
+	logger.Info("Starting datacollector service",
+	lg.Int("port", cfg.Server.Port),
+	lg.String("kafka_brokers", strings.Join(cfg.Kafka.Brokers, ", ")))
+
 	fmt.Println("Kafka brokers:", consumerCfg.Brokers)
 	cons := ku.NewConsumer[dm.Request](consumerCfg)
 	defer cons.Close()

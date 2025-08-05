@@ -1,0 +1,14 @@
+server:
+  port: 8080
+
+kafka:
+  brokers:
+    - "hev095wvtq2.sn.mynetname.net:31990"
+    - "hev095wvtq2.sn.mynetname.net:31991"
+    - "hev095wvtq2.sn.mynetname.net:31992"
+  topic: "orders"
+  groupID: "order-service"
+
+database:
+  mongoURI: "mongodb://localhost:27017"
+  dbName: "datacollector"
