@@ -31,6 +31,10 @@ const DATASERVICEURL = "http://localhost:8082/dataservice"
 const SERVICENAME = "HAM-datacollector"
 const SERVICEPORT = "8081" 
 
+// Debug
+const appConfig = "./apps/datacollector/config.yaml"
+//const appConfig = "config.yaml"
+
 type datacollectorHandler struct {
 	pool        *workerpool.Pool[SSHJob]
 	cancelFuncs  sync.Map
@@ -126,9 +130,9 @@ func main() {
 	handler := newDatacollectorHandler(logger)
 	
 	// Load configuration of the microservice
-	cfg, err := initConfig("./apps/datacollector/config.yaml")
+	cfg, err := initConfig(appConfig)
 	if err != nil {
-		logger.Error("Failed to setup configuration", lg.Any("error",err))
+		logger.Error("Setting configuration failed: ", lg.Any("error",err))
 	}
 	
 	// Set up Kafka consumer
