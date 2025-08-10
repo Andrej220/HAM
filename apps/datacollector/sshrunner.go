@@ -10,6 +10,8 @@ import (
 	"github.com/andrej220/HAM/pkg/executor"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
+	"time"
+	"os"
 )
 
 const (
@@ -100,11 +102,23 @@ func RunJob(jb SSHJob) (*gp.Graph, error) {
     if err != nil {
         return nil, err
     }
-    rclient, err := executor.NewResilientClient(
-        graph.Config.RemoteHost,
-        graph.Config.Login,
-        graph.Config.Password,
-    )
+	var sshkeyAuth ssh.AuthMethod
+	sshkeyAuth, err = publicKeyAuth(graph.Config.SSHKeyPath) 
+	if err != nil {
+		log.Printf("Failed parsing ssh keys, %v", err)
+		return graph, err
+	}
+	auth := []ssh.AuthMethod{ssh.Password(graph.Config.Password), sshkeyAuth}
+	clientConfig := &ssh.ClientConfig{
+		User: graph.Config.Login,
+		Auth:            auth, 
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         10 * time.Second,
+		BannerCallback:  func(message string) error { return nil }, //ignore banner
+	}
+
+    rclient, err := executor.NewResilientClient( graph.Config.RemoteHost, clientConfig )
+
     if err != nil {
         return nil, fmt.Errorf("ssh dial: %w", err)
     }
@@ -124,4 +138,17 @@ func RunJob(jb SSHJob) (*gp.Graph, error) {
         })
     }
     return graph, g.Wait()
+}
+
+func publicKeyAuth(privateKeyPath string) (ssh.AuthMethod, error) {
+	key, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read private key: %v", err)
+	}
+
+	signer, err := ssh.ParsePrivateKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse private key: %v", err)
+	}
+	return ssh.PublicKeys(signer), nil
 }
