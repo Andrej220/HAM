@@ -35,6 +35,7 @@ type Config struct {
 	Version    string    `json:"version"`
 	RemoteHost string    `json:"remote_host"`
 	Password   string    `json:"password"`
+	SSHKeyPath string    `json:"key"`
 	Login      string    `json:"login"`
 	CustomerID string    `json:"customer_id"`
 	HostID     string    `json:"host_id"`
