@@ -15,7 +15,7 @@ type Node struct {
 	PostProcess string   `json:"post_process,omitempty"` 
 	Children    []*Node  `json:"children,omitempty"`    
 	Result      []string `json:"result,omitempty"`      
-	Stderr 		[]string `json:"error,omitempy"`
+	Stderr 		[]string `json:"error,omitempty"`
 }
 
 type HostConfig struct {
