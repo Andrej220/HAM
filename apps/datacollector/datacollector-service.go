@@ -24,6 +24,9 @@ import (
 	gp "github.com/andrej220/HAM/pkg/graphproc"
 	dm "github.com/andrej220/HAM/pkg/shared-models"
 	//"go.mongodb.org/mongo-driver/pkg/logger"
+	"errors"
+	"github.com/segmentio/kafka-go"
+	"math"
 )
 
 const MAXTIMEOUT time.Duration = 1 * time.Minute
@@ -160,24 +163,31 @@ func main() {
 
 	// Run the consumer in a goroutine so we can wait for signals
 	done := make(chan struct{})
-	go func() {
+	go func(){
 		defer close(done)
+	    backoff := time.Second 
 		for {
-			select {
-			case <-ctx.Done():
-				logger.Info("Shutting down consumer loop...")
-				return
-			default:
-				order, err := cons.Read(ctx)
-				if err != nil {
-					logger.Error("error", lg.Any("err", err))
-					time.Sleep(time.Second)
+			order, err := cons.Read(ctx)
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					logger.Info("Shutting down consumer loop...")
+					return
+				}
+				if errors.Is(err, kafka.LeaderNotAvailable) ||
+				   strings.Contains(err.Error(), "Not Leader For Partition") {
+					logger.Warn("Leader change detected, waiting...",
+						lg.Any("backoff_seconds", backoff.Seconds()))
+					time.Sleep(backoff)
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(10*time.Second)))
 					continue
 				}
-				logger.Debug("Received msg", lg.Any("order", order))
-				fmt.Println("Received msg:", order)
-				Serve(order, handler, ctx)
+				logger.Error("Unexpected error", lg.Any("err", err))
+				continue
 			}
+		
+			logger.Debug("Received msg", lg.Any("order", order))
+			fmt.Println("Received msg:", order)
+			Serve(order, handler, ctx)
 		}
 	}()
 
