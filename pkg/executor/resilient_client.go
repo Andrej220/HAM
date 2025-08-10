@@ -74,27 +74,4 @@ func NewResilientClient(remote string,  config *ssh.ClientConfig) (*ResilientSSH
  		ResConf: resConfig,
     }, nil
 }
-// NewSSHSession creates a new SSH session with circuit breaker and backoff retries.
-// The caller is responsible for closing the returned session.
-func newSSHSession(client *ssh.Client,cb *gobreaker.CircuitBreaker) (*ssh.Session, error) {
-	res, err := cb.Execute(func() (any, error) {
-        return client.NewSession()
-    })
-    if err != nil {
-        return nil, err
-    }
-    return res.(*ssh.Session), nil
-}
 
-func publicKeyAuth(privateKeyPath string) ssh.AuthMethod {
-	key, err := os.ReadFile(privateKeyPath)
-	if err != nil {
-		log.Fatalf("unable to read private key: %v", err)
-	}
-
-	signer, err := ssh.ParsePrivateKey(key)
-	if err != nil {
-		log.Fatalf("unable to parse private key: %v", err)
-	}
-	return ssh.PublicKeys(signer)
-}
