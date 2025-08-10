@@ -5,8 +5,6 @@ import(
 		"golang.org/x/crypto/ssh"
 		"time"
 		"fmt"
-		"log"
-		"os"
 		"github.com/cenkalti/backoff/v4"
 )
 
@@ -44,16 +42,7 @@ func (c *ResilientSSHClient) Close() error {
     return c.SSHClient.Close()
 }
 
-func NewResilientClient(remote, login, password string) (*ResilientSSHClient, error) {
-	config := &ssh.ClientConfig{
-		User: login,
-		//Auth: []ssh.AuthMethod{ssh.Password(password)},
-		Auth:            []ssh.AuthMethod{publicKeyAuth("/home/andrey/.ssh/myadminvps.ru")}, // TODO: move to main
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
-		BannerCallback:  func(message string) error { return nil }, //ignore banner
-	}
-
+func NewResilientClient(remote string,  config *ssh.ClientConfig) (*ResilientSSHClient, error) {
 	client, err := ssh.Dial("tcp", remote, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial  %w", err)
