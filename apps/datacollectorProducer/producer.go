@@ -45,7 +45,8 @@ type Handler struct{
 	lg 			lg.Logger
 }
 
-func newKafkaProducer(lg lg.Logger, cfg DatacollectorProducerConfig) *Producer {
+func newKafkaProducer(logger lg.Logger, cfg DatacollectorProducerConfig) *Producer {
+	logger.Info("Starting Kafka writer.", lg.String("Brokers:", cfg.Kafka.Brokers))
 	return &Producer{
 		writer: &kafka.Writer{
 			Addr:     kafka.TCP(cfg.Kafka.Brokers),
@@ -54,7 +55,7 @@ func newKafkaProducer(lg lg.Logger, cfg DatacollectorProducerConfig) *Producer {
 			Async:    false, 
 			AllowAutoTopicCreation: true,
 		},
-		lg: lg,
+		lg: logger,
 	}
 }
 
@@ -179,7 +180,9 @@ func main(){
 	loggerCfg    := lg.NewConfigFromFlags(cfg.Service.Name)
 	logger := lg.New(loggerCfg)
 
-	logger.Info("starting service ", lg.String("str",cfg.Service.Name), lg.String("port", cfg.Service.Port))
+	logger.Info("Starting service. ", 
+			lg.String("Service name:",cfg.Service.Name), 
+			lg.String("Port:", cfg.Service.Port))
 
 	mux := http.NewServeMux()
 	handler := newProducerHandler(*cfg, logger)
