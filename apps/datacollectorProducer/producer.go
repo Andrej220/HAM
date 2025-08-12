@@ -7,6 +7,8 @@ import(
 	"net/http"
 	"github.com/andrej220/HAM/pkg/lg"
 	"github.com/andrej220/HAM/pkg/serverutil"
+	"github.com/andrej220/HAM/pkg/config"
+	dm "github.com/andrej220/HAM/pkg/shared-models"
 	"os"
 	"github.com/caarlos0/env/v6"
 	"context"
@@ -19,9 +21,6 @@ import(
 )
 
 const (
-	serviceName    = "DATACOLLECTORPRODUCER"
-	servicePort    = "8083"
-	HTTPpath       = "/datacollectorProducer"
 	MAXTIMEOUT     time.Duration = 2 * time.Minute
 )
 
@@ -113,24 +112,26 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 
 
 func main(){
-	cfg    := lg.NewConfigFromFlags(serviceName)
-	logger := lg.New(cfg)
+	
+	cfg, err := initConfig(config.GetConfigPath(PROJECTNAME, SERVICENAME, CONFIGFILENAME))
+	if err != nil {
+		fmt.Printf("Init config error: %v",err)
+		return
+	}
 
-	var kafkaCfg Config
-	if err := env.Parse(&kafkaCfg); err != nil {
-        logger.Error("failed to parse config: %v", lg.Any("error", err))
-    }
+	loggerCfg    := lg.NewConfigFromFlags(cfg.Service.Name)
+	logger := lg.New(loggerCfg)
 
-	logger.Info("starting service ", lg.String("str",serviceName), lg.String("port", servicePort))
+	logger.Info("starting service ", lg.String("str",cfg.Service.Name), lg.String("port", cfg.Service.Port))
 
 	mux := http.NewServeMux()
-	handler := newProducerHandler(kafkaCfg, logger)
-	mux.Handle(HTTPpath, serverutil.NewValidationHandler[dm.Request](handler))
+	handler := newProducerHandler(*cfg, logger)
+	mux.Handle(cfg.Service.HTTPpath, serverutil.NewValidationHandler[dm.Request](handler))
 
-	config := serverutil.DefaultServerConfig()
-	config.Logger = logger
-	config.Port = servicePort 
-	if err := serverutil.RunServer(mux, config); err != nil {
+	serverConfig := serverutil.DefaultServerConfig()
+	serverConfig.Logger = logger
+	serverConfig.Port = cfg.Service.Port 
+	if err := serverutil.RunServer(mux, serverConfig); err != nil {
 		logger.Error("Fatal error. Failed to run server: %v", lg.Any("err",err))
 		os.Exit(1)
 	}

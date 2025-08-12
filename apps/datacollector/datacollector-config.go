@@ -1,5 +1,9 @@
 package main
 
+const SERVICENAME = "datacollector"
+const CONFIGFILENAME = "config.yaml"
+const PROJECTNAME = "HAM"
+
 type DataCollectorConfig struct{
 	Server struct {
 		Port int `yaml:"port" json:"port"`

@@ -1,5 +1,9 @@
 package main
 
+const SERVICENAME = "dataservice"
+const CONFIGFILENAME = "config.yaml"
+const PROJECTNAME = "HAM"
+
 type DBConfig struct{
 	MongoCollection string	`yaml:"mongoCollection" json:"mongoCollection"`
 	MongoDBName 	string	`yaml:"mongoDBName" json:"mongoDBName"`

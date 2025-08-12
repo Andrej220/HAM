@@ -165,7 +165,7 @@ func initConfig(path string)(*DataserviceConfig, error){
 
 func main() {
 	
-	cfg, err := initConfig("./apps/datacollector/config.yaml")
+	cfg, err := initConfig(config.GetConfigPath(PROJECTNAME, SERVICENAME, CONFIGFILENAME))
 	if err != nil {
 		log.Fatalf("Failed to setup configuration, %v", err)
 	}

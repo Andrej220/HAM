@@ -1,0 +1,9 @@
+service:
+  name: "DATACOLLECTORPRODUCER"
+  port: "8083"
+  http_path: "/datacollectorProducer"
+
+kafka:
+  #brokers: "kafka.kafka.svc.cluster.local:9092"  
+  brokers: "hev095wvtq2.sn.mynetname.net:31990"
+  topic: "orders"  

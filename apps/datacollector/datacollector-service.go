@@ -31,12 +31,6 @@ import (
 
 const MAXTIMEOUT time.Duration = 1 * time.Minute
 const DATASERVICEURL = "http://localhost:8082/dataservice"
-const SERVICENAME = "HAM-datacollector"
-const SERVICEPORT = "8081" 
-
-// Debug
-const appConfig = "./apps/datacollector/config.yaml"
-//const appConfig = "config.yaml"
 
 type datacollectorHandler struct {
 	pool        *workerpool.Pool[SSHJob]
@@ -132,8 +126,7 @@ func main() {
 	logger := lg.New(loggercfg)
 	handler := newDatacollectorHandler(logger)
 	
-	// Load configuration of the microservice
-	cfg, err := initConfig(appConfig)
+	cfg, err := initConfig(config.GetConfigPath(PROJECTNAME, SERVICENAME, CONFIGFILENAME))
 	if err != nil {
 		logger.Error("Setting configuration failed: ", lg.Any("error",err))
 	}

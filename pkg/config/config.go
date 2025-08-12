@@ -7,6 +7,8 @@ import (
     "github.com/andrej220/HAM/pkg/config/configstore"
     "github.com/andrej220/HAM/pkg/config/filestore"
     "github.com/andrej220/HAM/pkg/config/mongostore"
+	"os"
+	"strings"
 )
 
 type StoreType int
@@ -14,6 +16,10 @@ type StoreType int
 const (
     FileStore StoreType = iota
     MongoStore
+)
+const (
+	prodRootDir = "/etc/"
+	devRootDir  = "./apps/"
 )
 
 var (
@@ -54,4 +60,22 @@ func NewStore(storeType StoreType, cfg any) (Config, error) {
 	default:
 		return nil, ErrInvalidStoreType
 	}
+}
+
+func GetConfigPath(projectName string, serviceName string, filename string) string {
+    
+    if path := os.Getenv(strings.ToUpper(serviceName) + "_CONFIG_PATH"); path != "" {
+        return path
+    }
+    
+    if os.Getenv("ENVIRONMENT") == "production" {
+        return prodRootDir + strings.ToUpper(projectName) +"/" + filename  
+    }    
+	
+	if os.Getenv("ENVIRONMENT") == "debug" {
+        return "./"  + filename 
+    }
+    
+    // 3. Default development path
+    return devRootDir + serviceName +"/" + filename
 }
