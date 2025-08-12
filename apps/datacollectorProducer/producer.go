@@ -10,24 +10,24 @@ import(
 	"github.com/andrej220/HAM/pkg/config"
 	dm "github.com/andrej220/HAM/pkg/shared-models"
 	"os"
-	"github.com/caarlos0/env/v6"
+	"fmt"
+	//"github.com/caarlos0/env/v6"
 	"context"
 	"time"
-	dm "github.com/andrej220/HAM/pkg/shared-models"
 	"github.com/segmentio/kafka-go"
 	"encoding/json"
 	"errors"
 	"github.com/google/uuid"
+	"math/rand"
 )
 
 const (
 	MAXTIMEOUT     time.Duration = 2 * time.Minute
+	maxAttempts   = 3
+	baseBackoff   = 100 * time.Millisecond
+	maxBackoff    = 800 * time.Millisecond
 )
 
-type Config struct {
-    KafkaBrokers string `env:"KAFKA_BROKERS" envDefault:"kafka.kafka.svc.cluster.local:9092"`
-    KafkaTopic   string `env:"KAFKA_TOPIC" envDefault:"remote-requests"`
-}
 
 type messageWriter interface {
     WriteMessages(context.Context, ...kafka.Message) error
@@ -45,11 +45,11 @@ type Handler struct{
 	lg 			lg.Logger
 }
 
-func newKafkaProducer(lg lg.Logger, cfg Config) *Producer {
+func newKafkaProducer(lg lg.Logger, cfg DatacollectorProducerConfig) *Producer {
 	return &Producer{
 		writer: &kafka.Writer{
-			Addr:     kafka.TCP(cfg.KafkaBrokers),
-			Topic:    cfg.KafkaTopic,
+			Addr:     kafka.TCP(cfg.Kafka.Brokers),
+			Topic:    cfg.Kafka.Topic,
 			Balancer: &kafka.LeastBytes{},
 			Async:    false, 
 			AllowAutoTopicCreation: true,
@@ -58,7 +58,7 @@ func newKafkaProducer(lg lg.Logger, cfg Config) *Producer {
 	}
 }
 
-func newProducerHandler(cfg  Config, lg lg.Logger) http.Handler {
+func newProducerHandler(cfg  DatacollectorProducerConfig, lg lg.Logger) http.Handler {
 	producer := newKafkaProducer(lg, cfg)
 	handler := &Handler{
 		producer: producer,
@@ -79,37 +79,94 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request){
 	defer cancel()
 	// set new UUID to the request
 	request.ExecutionUID = uuid.New()
-
+	h.lg.Info("Started new execution, %v", lg.Any("UUID", request.ExecutionUID))
 	message, err := json.Marshal(request)
 	if err != nil {
-		h.lg.Error("Failed to marshal request", lg.Any("err", err))
+		h.lg.Error("Failed to marshal request:", lg.Any("err", err))
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	//h.lg.Info("prepare to send message")
-	err = h.producer.writer.WriteMessages(ctx,
-		kafka.Message{
-			Key:   request.ExecutionUID[:],  
-			Value: message,
-			Time:  time.Now(),
-		},
-	)
-	//h.lg.Info("Message is sent")
+	//h.lg.Info("preparing to send message")
+	
+	msg := kafka.Message{
+		Key:   request.ExecutionUID[:],
+		Value: message,
+		Time:  time.Now(),
+	}
 
-	if err != nil {
-		if errors.Is(err, kafka.UnknownTopicOrPartition) {
-			h.lg.Error("Kafka topic does not exist", 
-				//lg.String("topic", kafkaTopic),
-				lg.String("action", "Create the topic manually or enable auto-creation"))
+	var lastErr error
+	start := time.Now()
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := h.producer.writer.WriteMessages(ctx, msg); err != nil {
+			lastErr = err
+			if !isTransientKafkaErr(err) || attempt == maxAttempts || ctx.Err() != nil {
+				break
+			}
+			// backoff + jitter
+			backoff := baseBackoff << (attempt - 1)
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+			jitter := time.Duration(rand.Intn(75)) * time.Millisecond
+			time.Sleep(backoff + jitter)
+			continue
 		}
-		http.Error(rw, "Failed to process request", http.StatusInternalServerError)
-		h.lg.Info("Failed to process request", lg.Any("ERROR",err))
+		lastErr = nil
+		break
+	}
+	if lastErr != nil {
+		if errors.Is(lastErr, kafka.UnknownTopicOrPartition) {
+			h.lg.Error("kafka topic does not exist",
+				lg.String("action", "create the topic or enable auto-creation"))
+			http.Error(rw, "Failed to process request", http.StatusServiceUnavailable)
+			return
+		}
+		// other broker/timeout errors as transient (503)
+		if isTransientKafkaErr(lastErr) || errors.Is(lastErr, context.DeadlineExceeded) || errors.Is(lastErr, context.Canceled) {
+			h.lg.Info("transient kafka/write error",
+				lg.Any("err", lastErr), lg.Any("latency", time.Since(start)))
+			http.Error(rw, "Service temporarily unavailable", http.StatusServiceUnavailable)
+			return
+		}
+
+		h.lg.Error("permanent write error",
+			lg.Any("err", lastErr), lg.Any("latency", time.Since(start)))
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+
 	rw.WriteHeader(http.StatusAccepted)
-	rw.Write([]byte("Request accepted and queued\n"))
+	_, _ = rw.Write([]byte("Request accepted and queued\n"))
 }
 
+func isTransientKafkaErr(err error) bool {
+	switch {
+	case errors.Is(err, kafka.LeaderNotAvailable),
+		errors.Is(err, kafka.NotEnoughReplicas),
+		errors.Is(err, kafka.RequestTimedOut),
+		errors.Is(err, kafka.NetworkException),
+		errors.Is(err, kafka.ReplicaNotAvailable):
+		return true
+	}
+	// deadline/ctx errors are transient from caller perspective
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	return false
+}
+
+func initConfig(path string)(*DatacollectorProducerConfig, error){
+	store, err := config.NewStore(config.FileStore, &config.FileConfig{Path: path})
+    if err != nil {
+        return nil, err
+    }
+    var cfg DatacollectorProducerConfig
+    if err := store.Load(&cfg); err != nil {
+        return nil, err
+    }
+    return &cfg, nil
+}
 
 func main(){
 	
