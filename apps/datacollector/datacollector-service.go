@@ -138,11 +138,10 @@ func main() {
 		GroupID: cfg.Kafka.GroupID,
 	}
 
-	logger.Info("Starting datacollector service",
-	lg.Int("port", cfg.Server.Port),
-	lg.String("kafka_brokers", strings.Join(cfg.Kafka.Brokers, ", ")))
+	logger.Info("Starting "+ SERVICENAME +" service",
+		lg.Int("port : ", cfg.Server.Port),
+		lg.String("kafka_brokers : ", strings.Join(cfg.Kafka.Brokers, ", ")))
 
-	fmt.Println("Kafka brokers:", consumerCfg.Brokers)
 	cons := ku.NewConsumer[dm.Request](consumerCfg)
 	defer cons.Close()
 
