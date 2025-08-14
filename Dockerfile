@@ -50,10 +50,10 @@ COPY  docconfig.json /etc/ham/docconfig.json
 # Expose port
 EXPOSE ${SERVICE_PORT}
 # Verify the binary exists and has execute permissions
-#RUN ls -la /usr/local/bin/${SERVICE_NAME} && \
-#    [ -f /usr/local/bin/${SERVICE_NAME} ] || (echo "Binary missing!" && exit 1)
-#RUN echo "Service binary: /usr/local/bin/${SERVICE_NAME}" && \
-#    ls -la /usr/local/bin/
+RUN ls -la /usr/local/bin/${SERVICE_NAME} && \
+    [ -f /usr/local/bin/${SERVICE_NAME} ] || (echo "Binary missing!" && exit 1)
+RUN echo "Service binary: /usr/local/bin/${SERVICE_NAME}" && \
+    ls -la /usr/local/bin/
 
 # Entry point
 CMD /usr/local/bin/${SERVICE_NAME}
