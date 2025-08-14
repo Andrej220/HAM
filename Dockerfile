@@ -27,7 +27,7 @@ RUN go mod download
 # Build the binary
 RUN cd apps/${SERVICE_NAME} && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build  -o /workspace/${SERVICE_NAME} .
-COPY config.yaml /workspace/
+COPY apps/${SERVICE_NAME}/config.yaml /workspace/
 
 
 #------------------
