@@ -27,7 +27,7 @@ RUN go mod download
 # Build the binary
 RUN cd apps/${SERVICE_NAME} && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build  -o /workspace/${SERVICE_NAME} .
-COPY apps/${SERVICE_NAME}/config.yaml /workspace/
+COPY config.yaml /workspace/
 
 
 #------------------
@@ -47,7 +47,7 @@ COPY --from=builder /workspace/${SERVICE_NAME} /usr/local/bin/${SERVICE_NAME}
 RUN chmod +x /usr/local/bin/${SERVICE_NAME}
 # Copy runtime config
 COPY  docconfig.json /etc/ham/docconfig.json
-COPY  --from=builder /workspace/config.yaml  /etc/ham/config.yaml
+#COPY  --from=builder /workspace/config.yaml  /etc/ham/config.yaml
 
 # Expose port
 EXPOSE ${SERVICE_PORT}
