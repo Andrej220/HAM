@@ -39,7 +39,7 @@ ARG SERVICE_NAME
 ARG SERVICE_PORT
 ENV SERVICE_NAME=${SERVICE_NAME} 
 # Add ca-certificates for SSH/HTTPS
-RUN apk --no-cache add ca-certificates && RUN mkdir -p /etc/ham
+RUN apk --no-cache add ca-certificates && mkdir -p /etc/ham
 
 # Copy binary
 COPY --from=builder /workspace/${SERVICE_NAME} /usr/local/bin/${SERVICE_NAME}
