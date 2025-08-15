@@ -69,9 +69,11 @@ spec:
         cd /workspace/gitops
         git config --global user.email "tekton@mail.com"
         git config --global user.name "Tekton Pipeline"
+        git config --global --add safe.directory /workspace/gitops
         echo "Git status before commit:"
         git status
         git add .
+        git diff
         git commit -m "[$(params.targetEnv)] update $(params.serviceName) → $(params.imageName)@${DIGEST}"
         export GIT_SSH_COMMAND="ssh -i /secrets/ssh-key/ssh-privatekey -o StrictHostKeyChecking=no"
         git push origin $(params.targetEnv)
