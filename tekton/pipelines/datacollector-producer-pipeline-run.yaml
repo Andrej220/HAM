@@ -14,7 +14,7 @@ spec:
     - name: serviceName
       value: "datacollectorProducer"
     - name: imageName
-      value: "local-registry.registry.svc.cluster.local:5000/datacollectorproducer:latest"
+      value: "local-registry.registry.svc.cluster.local:5000/datacollectorproducer"
     - name: targetEnv
       value: "test"
     - name: servicePort
