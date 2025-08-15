@@ -59,15 +59,16 @@ spec:
         kustomize edit set image $(params.serviceName)=$(params.imageName)@${DIGEST}
         echo "Kustomization file after edit:"
         cat kustomization.yaml
-        
+
     - name: clean-image-block
       image: mikefarah/yq:4
+      securityContext:
+        runAsUser: 0
       script: |
         #!/bin/sh
         set -ex
         cd /workspace/gitops/overlays/$(params.targetEnv)
         yq -i 'del(.images[].newTag)' kustomization.yaml
-        yq -i '.images[] |= (.newName |= sub(":[^@]+$"; ""))' kustomization.yaml
         echo "After cleanup:"; cat kustomization.yaml
 
     - name: commit-and-push
