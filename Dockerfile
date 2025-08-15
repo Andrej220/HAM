@@ -34,7 +34,7 @@ COPY apps/${SERVICE_NAME}/config.yaml /workspace/
 # Final stage
 #------------------
 
-FROM alpine:latest
+FROM alpine:3.20
 
 ARG SERVICE_NAME
 ARG SERVICE_PORT
@@ -50,7 +50,7 @@ COPY  docconfig.json /etc/ham/docconfig.json
 #COPY  --from=builder /workspace/config.yaml  /etc/ham/config.yaml
 
 # Expose port
-EXPOSE ${SERVICE_PORT}
+#EXPOSE ${SERVICE_PORT}
 # Verify the binary exists and has execute permissions
 RUN ls -la /usr/local/bin/${SERVICE_NAME} && \
     [ -f /usr/local/bin/${SERVICE_NAME} ] || (echo "Binary missing!" && exit 1)
