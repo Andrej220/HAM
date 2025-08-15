@@ -18,6 +18,6 @@ kubectl apply -f pipelines/datacollector-pipeline-run.yaml
 
 echo "Creating/updating SSH secret for GitOps…"
 kubectl create secret generic git-ssh-key \
-  --from-file=ssh-privatekey=~/home/user/.ssh/ham-gitops \
-  --from-file=ssh-publickey=~/home/user/.ssh/ham-gitops.pub \
+  --from-file=ssh-privatekey=/home/user/.ssh/ham-gitops \
+  --from-file=ssh-publickey=/home/user/.ssh/ham-gitops.pub \
   --from-literal=known_hosts="$(ssh-keyscan github.com)"
