@@ -65,6 +65,7 @@ spec:
       script: |
         #!/bin/sh
         set -ex
+        DIGEST="$(cat /workspace/source/digest-$(params.serviceName).txt)"
         cd /workspace/gitops
         git config --global user.email "tekton@mail.com"
         git config --global user.name "Tekton Pipeline"
