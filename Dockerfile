@@ -45,6 +45,7 @@ RUN apk --no-cache add ca-certificates && mkdir -p /etc/ham
 # Copy binary
 COPY --from=builder /workspace/${SERVICE_NAME} /usr/local/bin/${SERVICE_NAME}
 RUN chmod +x /usr/local/bin/${SERVICE_NAME}
+COPY /usr/local/bin/${SERVICE_NAME} /usr/local/bin/app
 # Copy runtime config
 COPY  docconfig.json /etc/ham/docconfig.json
 COPY  --from=builder /workspace/config.yaml  /etc/ham/config.yaml
@@ -58,4 +59,5 @@ RUN echo "Service binary: /usr/local/bin/${SERVICE_NAME}" && \
     ls -la /usr/local/bin/
 
 # Entry point
-CMD /usr/local/bin/${SERVICE_NAME}
+#CMD /usr/local/bin/${SERVICE_NAME}
+CMD /usr/local/bin/app
