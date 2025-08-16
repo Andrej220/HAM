@@ -3,9 +3,10 @@ server:
 
 kafka:
   brokers:
-    - "hev095wvtq2.sn.mynetname.net:31990"
-    - "hev095wvtq2.sn.mynetname.net:31991"
-    - "hev095wvtq2.sn.mynetname.net:31992"
+    - "kafka.kafka.svc.cluster.local:9092"
+    #- "hev095wvtq2.sn.mynetname.net:31990"
+    #- "hev095wvtq2.sn.mynetname.net:31991"
+    #- "hev095wvtq2.sn.mynetname.net:31992"
   topic: "orders"
   groupID: "order-service"
 
