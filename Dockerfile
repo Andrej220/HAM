@@ -43,8 +43,8 @@ ENV SERVICE_NAME=${SERVICE_NAME}
 RUN apk --no-cache add ca-certificates && mkdir -p /etc/ham
 
 # Copy binary
-COPY --from=builder /workspace/${SERVICE_NAME} /usr/local/bin/app #${SERVICE_NAME}
-RUN chmod +x /usr/local/bin/app #${SERVICE_NAME}
+COPY --from=builder /workspace/${SERVICE_NAME} /usr/local/bin/app 
+RUN chmod +x /usr/local/bin/app 
 # Copy runtime config
 COPY  docconfig.json /etc/ham/docconfig.json
 COPY  --from=builder /workspace/config.yaml  /etc/ham/config.yaml
