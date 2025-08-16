@@ -43,9 +43,8 @@ ENV SERVICE_NAME=${SERVICE_NAME}
 RUN apk --no-cache add ca-certificates && mkdir -p /etc/ham
 
 # Copy binary
-COPY --from=builder /workspace/${SERVICE_NAME} /usr/local/bin/${SERVICE_NAME}
-RUN chmod +x /usr/local/bin/${SERVICE_NAME}
-COPY /usr/local/bin/${SERVICE_NAME} /usr/local/bin/app
+COPY --from=builder /workspace/${SERVICE_NAME} /usr/local/bin/app #${SERVICE_NAME}
+RUN chmod +x /usr/local/bin/app #${SERVICE_NAME}
 # Copy runtime config
 COPY  docconfig.json /etc/ham/docconfig.json
 COPY  --from=builder /workspace/config.yaml  /etc/ham/config.yaml
@@ -53,10 +52,10 @@ COPY  --from=builder /workspace/config.yaml  /etc/ham/config.yaml
 # Expose port
 #EXPOSE ${SERVICE_PORT}
 # Verify the binary exists and has execute permissions
-RUN ls -la /usr/local/bin/${SERVICE_NAME} && \
-    [ -f /usr/local/bin/${SERVICE_NAME} ] || (echo "Binary missing!" && exit 1)
-RUN echo "Service binary: /usr/local/bin/${SERVICE_NAME}" && \
-    ls -la /usr/local/bin/
+#RUN ls -la /usr/local/bin/${SERVICE_NAME} && \
+#    [ -f /usr/local/bin/${SERVICE_NAME} ] || (echo "Binary missing!" && exit 1)
+#RUN echo "Service binary: /usr/local/bin/${SERVICE_NAME}" && \
+#    ls -la /usr/local/bin/
 
 # Entry point
 #CMD /usr/local/bin/${SERVICE_NAME}
