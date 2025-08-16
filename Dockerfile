@@ -50,4 +50,4 @@ COPY  docconfig.json /etc/ham/docconfig.json
 COPY  --from=builder /workspace/config.yaml  /etc/ham/config.yaml
 
 # Entry point
-CMD /usr/local/bin/app
+ENTRYPOINT ["/usr/local/bin/app"]
