@@ -72,7 +72,7 @@ func GetConfigPath(projectName string, serviceName string, filename string) stri
         return prodRootDir + strings.ToLower(projectName) +"/" + filename  
     }    
 	
-	if os.Getenv("APP_STAGE") == "debug" {
+	if os.Getenv("APP_STAGE") == "development" {
         return "./"  + filename 
     }
     
