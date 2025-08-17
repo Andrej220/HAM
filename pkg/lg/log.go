@@ -47,18 +47,31 @@ func NewConfigFromFlags(serviceName string) *Config {
     debug := fs.Bool("debug", false, "enable debug logging")
     format := fs.String("log-format", "json", "json or console")
     fs.Parse(os.Args[1:])
-    return &Config{ServiceName: serviceName, Debug: *debug, Format: *format}
+
+        // Check environment variable if debug flag wasn't set
+    envDebug := os.Getenv("APP_DEBUG") == "true" || 
+        os.Getenv("APP_DEBUG") == "1" ||
+        strings.EqualFold(os.Getenv("APP_DEBUG"), "true")
+    return &Config{ServiceName: serviceName, Debug: *debug||envDebug, Format: *format}
 }
 
 // NewLogger builds a zap-based Logger based on cfg.
 // It configures encoding, level, sampling, and initial fields.
 func New(cfg *Config) Logger {
     var baseCfg zap.Config
+
+    if !cfg.Debug {
+        cfg.Debug = os.Getenv("APP_DEBUG") == "true" || 
+                   os.Getenv("APP_DEBUG") == "1" ||
+                   strings.EqualFold(os.Getenv("APP_DEBUG"), "true")
+    }
+
     if cfg.Debug {
         baseCfg = zap.NewDevelopmentConfig()
         baseCfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
     } else {
         baseCfg = zap.NewProductionConfig()
+        baseCfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
     }
 
     // Allow console or JSON output
@@ -99,8 +112,12 @@ func (z *zapLogger) Sync() error {
     return z.l.Sync()
 }
 
-func (z *zapLogger) Debug(msg string, fields ...Field){}
-func (z *zapLogger) Warn(msg string, fields ...Field){}
+func (z *zapLogger) Debug(msg string, fields ...Field){
+     z.l.Debug(msg, fields...)
+}
+func (z *zapLogger) Warn(msg string, fields ...Field){
+    z.l.Warn(msg, fields...)
+}
 
 
 // defaultLogger falls back to the standard log package.
