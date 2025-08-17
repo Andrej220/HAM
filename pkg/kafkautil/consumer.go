@@ -4,7 +4,10 @@ import (
     "context"
     "encoding/json"
     "github.com/segmentio/kafka-go"
+    "time"
+    "net"
 )
+const 	DialTimeout      = 4 * time.Second  
 
 type Consumer[T any] struct {
     reader *kafka.Reader
@@ -41,4 +44,22 @@ func (c *Consumer[T]) Read(ctx context.Context) (T, error) {
 
 func (c *Consumer[T]) Close() error {
     return c.reader.Close()
+}
+
+// Try TCP dial to any broker to fail fast on obvious misconfig.
+func CanReachAnyBroker(brokers []string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for _, addr := range brokers {
+
+		dl := time.Until(deadline)
+		if dl <= 0 {
+			return false
+		}
+		conn, err := net.DialTimeout("tcp", addr, min(dl, DialTimeout))
+		if err == nil {
+			_ = conn.Close()
+			return true
+		}
+	}
+	return false
 }
