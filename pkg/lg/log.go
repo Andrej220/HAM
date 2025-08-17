@@ -52,6 +52,7 @@ func NewConfigFromFlags(serviceName string) *Config {
     envDebug := os.Getenv("APP_DEBUG") == "true" || 
         os.Getenv("APP_DEBUG") == "1" ||
         strings.EqualFold(os.Getenv("APP_DEBUG"), "true")
+        
     return &Config{ServiceName: serviceName, Debug: *debug||envDebug, Format: *format}
 }
 
