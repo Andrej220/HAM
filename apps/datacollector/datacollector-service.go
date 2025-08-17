@@ -129,6 +129,7 @@ func main() {
 	cfg, err := initConfig(config.GetConfigPath(PROJECTNAME, SERVICENAME, CONFIGFILENAME))
 	if err != nil {
 		logger.Error("Setting configuration failed: ", lg.Any("error",err))
+		return
 	}
 	
 	// Set up Kafka consumer
