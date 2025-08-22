@@ -6,6 +6,7 @@ import (
     "github.com/segmentio/kafka-go"
     "time"
     "net"
+    "fmt"
 )
 const 	DialTimeout      = 4 * time.Second  
 
@@ -40,6 +41,25 @@ func (c *Consumer[T]) Read(ctx context.Context) (T, error) {
     }
 
     return payload, nil
+}
+
+func (c *Consumer[T]) ReadWithMeta(ctx context.Context) (T, kafka.Message, error) {
+    var zero T
+    msg, err := c.reader.FetchMessage(ctx)
+    if err != nil {
+        return zero, msg, err
+    }
+    var out T
+    if err := json.Unmarshal(msg.Value, &out); err != nil {
+        // surface the decode error but still return raw msg so caller can commit/DLQ
+        return zero, msg, fmt.Errorf("unmarshal: %w", err)
+    }
+    return out, msg, nil
+}
+
+// Commit the offset of a specific message
+func (c *Consumer[T]) Commit(ctx context.Context, msg kafka.Message) error {
+    return c.reader.CommitMessages(ctx, msg)
 }
 
 func (c *Consumer[T]) Close() error {
