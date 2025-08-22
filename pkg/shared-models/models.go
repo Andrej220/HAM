@@ -5,8 +5,8 @@ import(
 )
 
 type Request struct {
-	HostID   int `json:"hostid"`
-	ScriptID int `json:"scriptid"`
+	HostID   int `json:"hostid,string"`
+	ScriptID int `json:"scriptid,string"`
 	ExecutionUID uuid.UUID `json:"exuid"`
 }
 
