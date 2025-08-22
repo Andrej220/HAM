@@ -8,10 +8,13 @@ import (
 	"context"
 	"time"
 	"fmt"
+	boff "github.com/andrej220/HAM/pkg/backoff"
 )
 const (
 	TotalMaxWorkers = 10
 	maxAttemps		= 3
+	initialBackoff  = 1* time.Second
+	maxBackoff 		= 6* time.Second
 )
 
 type JobFunc[T any] func(T) error
@@ -90,7 +93,9 @@ func (p *Pool[T]) worker(job Job[T]) {
 			atomic.LoadInt32(&p.activeWorkers)) )
 
 	doneCh := make(chan error, 1)
+
 	go func() {
+		boff := boff.New(initialBackoff, maxBackoff, time.Now().UnixNano())
 		var err error
 		for attempt := 1; attempt <= maxAttemps; attempt++ {
 			err = job.Fn(job.Payload)
@@ -98,29 +103,45 @@ func (p *Pool[T]) worker(job Job[T]) {
 				doneCh <- nil
 				return
 			}
-			time.Sleep(time.Duration(attempt) * time.Second)
+			
+			if attempt == maxAttemps{
+				doneCh <- fmt.Errorf("failed after %d attempts: %w", attempt, err)
+			}
+
+			delay := boff.Next()
+			logger.Warn("job attempt failed; backing off",
+					lg.Int("attempt", attempt),
+					lg.Any("error", err),
+					lg.String("sleep", delay.String()))
+
+			timer := time.NewTimer(delay)
+			select {
+			case <-timer.C:
+			case <-job.Ctx.Done():
+				if !timer.Stop(){
+					<- timer.C
+				}
+				doneCh <- job.Ctx.Err()
+				return
+			}
 		}
-		doneCh <- fmt.Errorf("failed after 3 attempts: %w", err)
+		//doneCh <- fmt.Errorf("failed after 3 attempts: %w", err)
 	}()
 
 	select {
 	case <-job.Ctx.Done():
-		//log.Printf("Job canceled with payload: %+v, reason: %v", job.Payload, job.Ctx.Err())
-		logger.Info( fmt.Sprintf("Job canceled with payload: %+v, reason: %v", 
-								lg.Any("job",job.Payload), 
-								job.Ctx.Err()) )
+			logger.Info("Job canceled",
+				lg.Any("payload", job.Payload),
+				lg.Any("reason", job.Ctx.Err()))
 	case err := <-doneCh:
 		if err != nil {
-			//log.Printf("Worker error with payload %+v: %v", job.Payload, err)
-			logger.Info(fmt.Sprintf("Worker error with payload %+v: %v", 
-								lg.Any("job",job.Payload), 
-								lg.Any("error", err)) )
+			logger.Error("Worker error",
+				lg.Any("payload", job.Payload),
+				lg.Any("error", err))
 		} else {
-//			log.Printf("Worker finished job with payload: %+v; # of workers: %d",
-//				job.Payload, atomic.LoadInt32(&p.activeWorkers))
-			logger.Info(fmt.Sprintf("Worker finished for job %+v: %v ", 
-								lg.Any("job",job.Payload), 
-								lg.Int32("workers", atomic.LoadInt32(&p.activeWorkers))) )
+			logger.Info("Worker finished",
+				lg.Any("payload", job.Payload),
+				lg.Int32("#workers", atomic.LoadInt32(&p.activeWorkers)))
 		}
 	}
 }
