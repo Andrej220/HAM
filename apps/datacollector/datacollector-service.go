@@ -373,3 +373,13 @@ func app() int {
 func main() { 
 	os.Exit(app()) 
 }
+
+//{"HostID":"1","ScriptID":"1","ExecutionUID":"1001"}
+//{"HostID":1,"ScriptID":1,"ExecutionUID":"1001"}
+//
+//./kafka-console-producer.sh   --bootstrap-server kafka-0.kafka-headless.kafka.svc.cluster.local:9092   --topic orders
+//>{"HostID":1,"ScriptID":1,"ExecutionUID":"1001"}
+//>{"HostID":1,"ScriptID":1,"ExecutionUID":"00000000-0000-0000-0000-000000000000"}
+//>{"HostID":1,"ScriptID":1,"ExecutionUID":"00000000-0000-0000-0000-000000000000"}
+//
+//kubectl exec -ti -n kafka kafka-0 -- bash
