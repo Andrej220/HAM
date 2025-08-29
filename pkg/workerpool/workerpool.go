@@ -87,7 +87,6 @@ func (p *Pool[T]) worker(job Job[T]) {
 		}
 	}()
 	logger := lg.FromContext(job.Ctx).With(lg.Any("job", job.Payload))
-	//TODO: USE WITH
 	logger.Info(fmt.Sprintf("Worker started with payload: %+v; # of workers: %v", 
 			lg.Any("job",job.Payload), 
 			atomic.LoadInt32(&p.activeWorkers)) )
@@ -125,7 +124,6 @@ func (p *Pool[T]) worker(job Job[T]) {
 				return
 			}
 		}
-		//doneCh <- fmt.Errorf("failed after 3 attempts: %w", err)
 	}()
 
 	select {

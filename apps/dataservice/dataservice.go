@@ -17,7 +17,7 @@ import (
 	"github.com/andrej220/HAM/pkg/config"
 )
 
-// TODO: implement api function to initialize MongoDB
+// [ ]: initialize MongoDB
 
 const mongoDBCollection = "mycollection"
 const mongoDBDatabase = "appdb"
@@ -170,7 +170,7 @@ func main() {
 		log.Fatalf("Failed to setup configuration, %v", err)
 	}
 
-	// TODO: establish connection to PostgreSQL
+	// [ ]: establish connection to PostgreSQL
 	mdbClient, err := dbinitialize(cfg.DB.MongoURI)
 	if err != nil {
 		log.Fatalf("Failed to initialize MongoDB: %v", err)
@@ -185,6 +185,6 @@ func main() {
 	config.Port = cfg.Server.Port
 	serverutil.RunServer(mux, config)
 
-	// TODO: implement graceful DB shutdown
+	// [ ]: Add graceful DB shutdown
 
 }

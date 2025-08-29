@@ -79,7 +79,7 @@ func (t * task)Run(script string, ctx context.Context)(stdout io.Reader, stderr 
 
 func loadGraphConfig(jb SSHJob)(*gp.Graph, error){
 
-	//TODO: load task from the database
+	//[ ]: load task from the database
 	graph, err := gp.NewGraphFromJSON("/etc/ham/docconfig.json")
 	if err != nil {
 		log.Printf("Error reading configuration %+v", err)
@@ -87,7 +87,7 @@ func loadGraphConfig(jb SSHJob)(*gp.Graph, error){
 	}
 	graph.UUID = jb.UUID
 
-	// TODO: delete it, just for the test. Should be populated from the database
+	// [ ]: delete it, just for the test. Should be populated from the database
 	graph.HostCfg = &gp.HostConfig{
 		CustomerID: 	1,
 		HostID:     	jb.HostID,

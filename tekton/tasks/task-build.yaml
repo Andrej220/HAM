@@ -28,7 +28,6 @@ spec:
 
     - name: build-and-push
       image: gcr.io/kaniko-project/executor:latest
-      # Pass SERVICE_NAME and SERVICE_PORT as build‐args; Kaniko invokes the root‐level Dockerfile
       args:
         - "--context=/workspace/source"
         - "--dockerfile=/workspace/source/Dockerfile"

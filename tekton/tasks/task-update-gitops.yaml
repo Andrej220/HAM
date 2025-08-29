@@ -18,8 +18,8 @@ spec:
       description: "Overlay environment to update: 'test' or 'production'"
       default: "test"
   workspaces:
-    - name: source   # same workspace where build-push wrote digest-<service>.txt
-    - name: gitops   # a workspace for cloning the GitOps repo
+    - name: source   
+    - name: gitops   
   volumes:
     - name: ssh-key-volume
       secret:
@@ -68,7 +68,7 @@ spec:
         #!/bin/sh
         set -ex
         cd /workspace/gitops/overlays/$(params.targetEnv)
-        yq -i 'del(.images[].newTag)' kustomization.yaml
+        #yq -i 'del(.images[].newTag)' kustomization.yaml
         echo "After cleanup:"; cat kustomization.yaml
 
     - name: commit-and-push

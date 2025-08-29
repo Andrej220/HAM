@@ -5,7 +5,6 @@ go 1.23.6
 //replace github.com/andrej220/HAM => ../HAM
 
 require (
-	github.com/caarlos0/env/v6 v6.10.1
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-playground/validator/v10 v10.26.0

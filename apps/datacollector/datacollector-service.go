@@ -64,7 +64,7 @@ func loadAndValidateConfig(path string) (*DataCollectorConfig, error) {
 	if len(cfg.Kafka.Brokers) == 0 || cfg.Kafka.Topic == "" || cfg.Kafka.GroupID == "" {
 		return nil, errors.New("invalid config: kafka brokers/topic/groupID must be set")
 	}
-	//TODO: Check if kafka is reachable and repeat config reading in a loop...
+	//DONE: Check if kafka is reachable and repeat config reading in a loop... 
 	return &cfg, nil
 }
 

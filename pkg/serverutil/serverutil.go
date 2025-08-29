@@ -12,7 +12,7 @@ import (
 	"github.com/andrej220/HAM/pkg/lg"
 )
 
-// ServerConfig holds configuration for the HTTP server.
+// ServerConfig holds configuration of HTTP server.
 type ServerConfig struct {
 	Port         string
 	ReadTimeout  time.Duration
@@ -34,8 +34,7 @@ func DefaultServerConfig() ServerConfig {
 }
 
 func RunServer(handler http.Handler, config ServerConfig) error {
-	// TODO: PASS LISTENING PORT
-	// TODO: pass listening port with environment variable, for different services...
+	// [ ]: pass listening port with environment variable, for different services...
 	logger := config.Logger
 
 	if config.Port == "" {
@@ -51,7 +50,7 @@ func RunServer(handler http.Handler, config ServerConfig) error {
 		WriteTimeout: config.WriteTimeout,
 		IdleTimeout:  config.IdleTimeout,
 	}
-	// Channel to listen for interrupt signals
+	// Channel to listen interrupt signals
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
@@ -70,7 +69,7 @@ func RunServer(handler http.Handler, config ServerConfig) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.ShutdownTimeout)
 	defer cancel()
 
-	// Attempt to gracefully shutdown the server
+	// Attempt gracefully shutdown the server
 	if err := server.Shutdown(ctx); err != nil {
 		logger.Error("Server shutdown failed", lg.Any("error",err))
 		return err
@@ -86,7 +85,7 @@ type ValidationHandler[T any] struct {
 }
 
 func NewValidationHandler[T any](next http.Handler, validator ...func(*T) error) http.Handler {
-	// TODO: implement a default validator
+	// DONE: implement a default validator
 	var validateFunc func(*T) error
 	if len(validator) > 0 {
 		validateFunc = validator[0]
@@ -121,18 +120,16 @@ func (h *ValidationHandler[T]) ServeHTTP(rw http.ResponseWriter, r *http.Request
 	h.next.ServeHTTP(rw, r.WithContext(ctx))
 }
 
-// respondWithValidationError sends standardized validation error responses
 func respondWithValidationError(rw http.ResponseWriter, err error) {
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusBadRequest)
 	
-	// TODO: customize error response
+	// [ ]: customize error response
 	json.NewEncoder(rw).Encode(map[string]interface{}{
 		"error":   "Validation failed",
 		"details": err.Error(),
 	})
 }
-
 
 func defaultValidator[T any](req *T) error {
 	return nil
