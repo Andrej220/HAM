@@ -79,7 +79,7 @@ func (t * task)Run(script string, ctx context.Context)(stdout io.Reader, stderr 
 
 func loadGraphConfig(jb SSHJob)(*gp.Graph, error){
 
-	//[ ]: load task from the database
+	//[ ]: load datastruct (script tree) readin CRD and host address and credentials from DB
 	graph, err := gp.NewGraphFromJSON("/etc/ham/docconfig.json")
 	if err != nil {
 		log.Printf("Error reading configuration %+v", err)
