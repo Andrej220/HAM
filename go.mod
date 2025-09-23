@@ -5,6 +5,8 @@ go 1.23.6
 //replace github.com/andrej220/HAM => ../HAM
 
 require (
+	github.com/Andrej220/go-utils/wpool v0.1.2
+	github.com/Andrej220/go-utils/zlog v0.1.1
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-playground/validator/v10 v10.26.0
@@ -20,6 +22,12 @@ require (
 )
 
 require (
+	github.com/Andrej220/go-utils v0.0.0-20250921203542-c744a969000f // indirect
+	github.com/Andrej220/go-utils/httpsrv v0.1.1 // indirect
+)
+
+require (
+	github.com/Andrej220/go-utils/backoff v0.1.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect

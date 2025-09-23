@@ -18,12 +18,11 @@ import (
 	"github.com/andrej220/HAM/pkg/config"
 	gp "github.com/andrej220/HAM/pkg/graphproc"
 	ku "github.com/andrej220/HAM/pkg/kafkautil"
-	"github.com/andrej220/HAM/pkg/lg"
 	dm "github.com/andrej220/HAM/pkg/shared-models"
-	boff "github.com/andrej220/HAM/pkg/backoff"
-	"github.com/andrej220/HAM/pkg/workerpool"
-
-	"github.com/andrej220/HAM/pkg/serverutil"
+	boff "github.com/Andrej220/go-utils/backoff"
+	lg "github.com/Andrej220/go-utils/zlog"
+	"github.com/Andrej220/go-utils/wpool"
+	"github.com/Andrej220/go-utils/httpsrv"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -38,18 +37,17 @@ type datacollectorHandler struct {
 	pool        *workerpool.Pool[SSHJob]
 	cancelFuncs sync.Map
 	httpClient  *http.Client
-	logger      lg.Logger
+	logger      lg.ZLogger
 }
 
 type consumerDeps struct {
-	logger  lg.Logger
+	logger  lg.ZLogger
 	handler *datacollectorHandler
 	build   func(*DataCollectorConfig) (*ku.Consumer[dm.Request], error)
 }
 
-func setupLogger() lg.Logger {
-	cfg := lg.NewConfigFromFlags(SERVICENAME)
-	return lg.New(cfg)
+func setupLogger() lg.ZLogger {
+	return lg.NewDefault(SERVICENAME)
 }
 
 func loadAndValidateConfig(path string) (*DataCollectorConfig, error) {
@@ -68,9 +66,9 @@ func loadAndValidateConfig(path string) (*DataCollectorConfig, error) {
 	return &cfg, nil
 }
 
-func newHandler(logger lg.Logger) *datacollectorHandler {
+func newHandler(logger lg.ZLogger) *datacollectorHandler {
 	return &datacollectorHandler{
-		pool: workerpool.NewPool[SSHJob](workerpool.TotalMaxWorkers),
+		pool: workerpool.NewPool[SSHJob](10,*workerpool.GetDefaultRP()),
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -147,11 +145,11 @@ func readinessMux() *http.ServeMux {
 	return m
 }
 
-func startProbeServerAsync(port string, logger lg.Logger) {
+func startProbeServerAsync(port string, logger lg.ZLogger) {
 	go func() {
-		_ = serverutil.RunServer(
+		_ = srvx.RunServer(
 			readinessMux(),
-			serverutil.ServerConfig{
+			srvx.ServerConfig{
 				Port:            port, // e.g., from cfg.Server.Port
 				ReadTimeout:     5 * time.Second,
 				WriteTimeout:    5 * time.Second,
@@ -237,7 +235,7 @@ func (d *consumerDeps) runConsumer(ctx context.Context, cfg *DataCollectorConfig
 	}
 }
 
-func waitKafkaReachable( ctx context.Context, filename string, logger lg.Logger) (*DataCollectorConfig, error){
+func waitKafkaReachable( ctx context.Context, filename string, logger lg.ZLogger) (*DataCollectorConfig, error){
 	const (
 		initial    = 30 * time.Second
 		maxBackoff = 3  * initial

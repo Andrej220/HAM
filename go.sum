@@ -1,3 +1,15 @@
+github.com/Andrej220/go-utils v0.0.0-20250921203542-c744a969000f h1:aWt01HYHwdg9cAyWMYDUMg3EhSZ0Nv0DSsiYSzgSTO8=
+github.com/Andrej220/go-utils v0.0.0-20250921203542-c744a969000f/go.mod h1:xaUIR5Cp/ZJviBYG8ESPLXAMiRb+NB3WKVqxVeixPLs=
+github.com/Andrej220/go-utils/backoff v0.1.0 h1:ZzpNB8BTDXpd0Y8Wm87Shu5pT3J9AShs7T1xSMTablc=
+github.com/Andrej220/go-utils/backoff v0.1.0/go.mod h1:gMBWcKPFHfn6vHirQmX1wO3dz7zLAS1GyH3vIVG3pe0=
+github.com/Andrej220/go-utils/httpsrv v0.1.1 h1:+YD0jZ7eOATUsguWM8IVcfdjM2jEdO/+bWac7Zgiw+U=
+github.com/Andrej220/go-utils/httpsrv v0.1.1/go.mod h1:t1aNjZJ2ktntjpDriEsCCzCx7FoZHygUWbdxanrUZgY=
+github.com/Andrej220/go-utils/wpool v0.1.2 h1:/kfFwNzTXjKfT+5Ecs0INOd0F0ka60chivlkUWoXZ/4=
+github.com/Andrej220/go-utils/wpool v0.1.2/go.mod h1:qnDtQBTmdB3jpUEZp9WwTaoo6bpDFLIM2Amp4J8XZ7k=
+github.com/Andrej220/go-utils/zlog v0.1.0 h1:1wNhggTZeBXQUdWlEZa5STASGSw65gDz7Wj/jMuyLhw=
+github.com/Andrej220/go-utils/zlog v0.1.0/go.mod h1:400xlExrKSVtMOX7xFikJE9DyZPV3rcjWKjvy+ITO3w=
+github.com/Andrej220/go-utils/zlog v0.1.1 h1:AatTkG1D3RGGhFbij9P1lteo3vpttzY2A3/xd1nehiA=
+github.com/Andrej220/go-utils/zlog v0.1.1/go.mod h1:400xlExrKSVtMOX7xFikJE9DyZPV3rcjWKjvy+ITO3w=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
